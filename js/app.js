@@ -1678,13 +1678,93 @@
   });
 
 
+  /* One command map for both menu renderings: the in-app hamburger below
+     and the native menu bar (electron/main.cjs builds it from
+     js/menu-spec.js and sends ids back over claudeamp:menu-command).
+     test/menu-spec.test.cjs pins that every spec id has a handler here. */
+  const ZOOM_STEPS = [1, 1.5, 2, 2.5, 3];
+  function stepZoom(direction) {
+    const at = ZOOM_STEPS.indexOf(S.zoom);
+    const next = ZOOM_STEPS[Math.max(0, Math.min(ZOOM_STEPS.length - 1,
+      (at < 0 ? 1 : at) + direction))];
+    setZoom(next);
+  }
+  function toggleWindowCmd(id) {
+    WM.toggle(id); syncWinButtons();
+  }
+  const MENU_COMMANDS = {
+    "about": () => showDialog("dlg-about"),
+    "welcome": openSetup,
+    "settings": openSettings,
+    "open-audio": () => $("file-audio").click(),
+    "saved-playlists": openSavedPlaylists,
+    "jump-to-track": openJump,
+    "toggle-win-main": () => toggleWindowCmd("win-main"),
+    "toggle-win-chat": () => toggleWindowCmd("win-chat"),
+    "toggle-win-eq": () => toggleWindowCmd("win-eq"),
+    "toggle-win-pl": () => toggleWindowCmd("win-pl"),
+    "toggle-win-usage": () => toggleWindowCmd("win-usage"),
+    "toggle-win-mb": () => toggleWindowCmd("win-mb"),
+    "toggle-win-term": () => setChatMode(WM.visible("win-term") ? "chat" : "shell"),
+    "mode-chat": () => setChatMode("chat"),
+    "mode-shell": () => setChatMode("shell"),
+    "zoom-1": () => setZoom(1),
+    "zoom-1.5": () => setZoom(1.5),
+    "zoom-2": () => setZoom(2),
+    "zoom-2.5": () => setZoom(2.5),
+    "zoom-3": () => setZoom(3),
+    "zoom-in": () => stepZoom(1),
+    "zoom-out": () => stepZoom(-1),
+    "logout": () => { const cli = provider().cli; if (cli) logoutCli(cli); },
+    "quit": quitApp,
+    "play-pause": () => { if (Music.mode === "playing") Music.pause(); else Music.play(); },
+    "next-track": () => Music.next(false),
+    "prev-track": () => Music.prev(),
+    "show-terminal": () => setChatMode("shell"),
+    "help-docs": () => window.open("https://github.com/petehottelet/claudeamp#readme"),
+    "help-changelog": () => window.open("https://github.com/petehottelet/claudeamp/blob/main/CHANGELOG.md"),
+    "help-issue": () => window.open("https://github.com/petehottelet/claudeamp/issues"),
+  };
+  function runMenuCommand(id) {
+    const fn = MENU_COMMANDS[id];
+    if (fn) { fn(); syncMenuState(); }
+  }
+  // State flows renderer -> main so the native checkmarks stay honest.
+  // Pushed after every command and on a slow heartbeat (window buttons and
+  // drags change visibility outside the command map); main rebuilds only
+  // when the payload actually changed.
+  let lastMenuState = "";
+  function syncMenuState() {
+    const desktop = window.claudeAmpDesktop;
+    if (!desktop || !desktop.setMenuState) return;
+    const cliName = provider().cli;
+    const cliState = cliName ? bridgeStatus[cliName] : null;
+    const state = {
+      windows: {
+        "win-main": WM.visible("win-main"), "win-chat": WM.visible("win-chat"),
+        "win-eq": WM.visible("win-eq"), "win-pl": WM.visible("win-pl"),
+        "win-usage": WM.visible("win-usage"), "win-mb": WM.visible("win-mb"),
+        "win-term": WM.visible("win-term"),
+      },
+      mode: S.chatMode === "shell" ? "shell" : "chat",
+      zoom: S.zoom,
+      termAvailable: !!window.claudeampTerm,
+      signedIn: !!(cliState && cliState.ready),
+      account: (cliState && cliState.account) || "",
+    };
+    const key = JSON.stringify(state);
+    if (key === lastMenuState) return;
+    lastMenuState = key;
+    try { desktop.setMenuState(state); } catch (_) {}
+  }
+
   function mainMenu(x, y, guide = null) {
     const guideLogin = !guide && !store.raw(LOGIN_MENU_ONBOARDING_KEY);
     const guideTarget = guide?.target || (guideLogin ? "settings" : "");
     const guided = id => id === guideTarget ? { className: "login-onboarding", sparkles: true } : {};
     const winItem = (label, id) => ({
       label, checked: WM.visible(id),
-      fn: () => { WM.toggle(id); syncWinButtons(); },
+      fn: () => runMenuCommand("toggle-" + id),
     });
     // Signed-in CLI account line + logout action, shown only when a
     // subscription model is connected. This group lives in the menu footer.
@@ -1693,17 +1773,17 @@
     const signedIn = cliState && cliState.ready;
     const accountItems = signedIn ? [
       { label: cliState.account || "Signed in", disabled: true },
-      { label: "Log Out", fn: () => logoutCli(cliName) },
+      { label: "Log Out", fn: () => runMenuCommand("logout") },
     ] : [];
 
     openMenu([
-      { label: "Welcome", fn: openSetup },
-      { label: "Settings", id: "settings", fn: openSettings, ...guided("settings") },
-      { label: "About ClaudeAmp...", fn: () => showDialog("dlg-about") },
+      { label: "Welcome", fn: () => runMenuCommand("welcome") },
+      { label: "Settings", id: "settings", fn: () => runMenuCommand("settings"), ...guided("settings") },
+      { label: "About ClaudeAmp...", fn: () => runMenuCommand("about") },
       "-",
-      { label: "Open Audio Files...", fn: () => $("file-audio").click() },
-      { label: "Saved Playlists...", fn: openSavedPlaylists },
-      { label: "Jump to Track...", fn: openJump },
+      { label: "Open Audio Files...", fn: () => runMenuCommand("open-audio") },
+      { label: "Saved Playlists...", fn: () => runMenuCommand("saved-playlists") },
+      { label: "Jump to Track...", fn: () => runMenuCommand("jump-to-track") },
       "-",
       winItem("Main Window", "win-main"),
       winItem("Chat", "win-chat"),
@@ -1712,20 +1792,20 @@
       winItem("Usage Monitor", "win-usage"),
       winItem("Visualization", "win-mb"),
       { label: "Terminal", checked: WM.visible("win-term"),
-        fn: () => setChatMode(WM.visible("win-term") ? "chat" : "shell") },
+        fn: () => runMenuCommand("toggle-win-term") },
       "-",
-      { label: "Mode: AI Chat", checked: S.chatMode !== "shell", fn: () => setChatMode("chat") },
+      { label: "Mode: AI Chat", checked: S.chatMode !== "shell", fn: () => runMenuCommand("mode-chat") },
       { label: "Mode: Real Terminal", checked: S.chatMode === "shell",
-        disabled: !window.claudeampTerm, fn: () => setChatMode("shell") },
+        disabled: !window.claudeampTerm, fn: () => runMenuCommand("mode-shell") },
       "-",
-      { label: "Zoom 1x", checked: S.zoom === 1, fn: () => setZoom(1) },
-      { label: "Zoom 1.5x", checked: S.zoom === 1.5, fn: () => setZoom(1.5) },
-      { label: "Zoom 2x", checked: S.zoom === 2, fn: () => setZoom(2) },
-      { label: "Zoom 2.5x", checked: S.zoom === 2.5, fn: () => setZoom(2.5) },
-      { label: "Zoom 3x", checked: S.zoom === 3, fn: () => setZoom(3) },
+      { label: "Zoom 1x", checked: S.zoom === 1, fn: () => runMenuCommand("zoom-1") },
+      { label: "Zoom 1.5x", checked: S.zoom === 1.5, fn: () => runMenuCommand("zoom-1.5") },
+      { label: "Zoom 2x", checked: S.zoom === 2, fn: () => runMenuCommand("zoom-2") },
+      { label: "Zoom 2.5x", checked: S.zoom === 2.5, fn: () => runMenuCommand("zoom-2.5") },
+      { label: "Zoom 3x", checked: S.zoom === 3, fn: () => runMenuCommand("zoom-3") },
       ...(accountItems.length ? ["-", ...accountItems] : []),
       "-",
-      { label: "Quit ClaudeAmp", fn: quitApp },
+      { label: "Quit ClaudeAmp", fn: () => runMenuCommand("quit") },
     ], x, y);
     if (guide?.message) {
       const row = ctxmenu.querySelector(`[data-menu-id="${guideTarget}"]`);
@@ -3816,6 +3896,14 @@
       updateNotice = "NEW: CLAUDEAMP V" + String(info.version || "").toUpperCase() +
         " IS OUT - CLAUDEAMP.COM  ***  ";
     });
+  // Native menu bar: commands arrive from main by id; state flows back so
+  // the native checkmarks track the app (heartbeat catches visibility
+  // changes made with window buttons or drags).
+  if (window.claudeAmpDesktop && window.claudeAmpDesktop.onMenuCommand) {
+    window.claudeAmpDesktop.onMenuCommand(runMenuCommand);
+    setInterval(syncMenuState, 2000);
+    setTimeout(syncMenuState, 500);
+  }
   WM.init();
   $("desktop").style.setProperty("--zoom", S.zoom);
   buildEqThumbs();

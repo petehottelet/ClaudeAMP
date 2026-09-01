@@ -172,6 +172,23 @@ function screenPointOverShape(px, py) {
 function startMacHitTester() {
   if (process.platform !== "darwin" || macPoll) return;
   let lastX = null, lastY = null;
+  // CLAUDEAMP_HITTEST_TRACE=1 appends the poll's decisions to
+  // userData/hittest.log - one failing click with this log shows whether
+  // the poll saw the cursor over a rect (a timing race) or did not
+  // (stale or missing shape rects). Lines are written on state changes
+  // plus a heartbeat, not every tick.
+  const trace = process.env.CLAUDEAMP_HITTEST_TRACE === "1";
+  let lastTrace = "", lastTraceAt = 0;
+  const traceLine = entry => {
+    const key = `${entry.over}|${entry.near}|${entry.ignoring}|${entry.rects}`;
+    const now = Date.now();
+    if (key === lastTrace && now - lastTraceAt < 250) return;
+    lastTrace = key; lastTraceAt = now;
+    try {
+      fs.appendFile(path.join(app.getPath("userData"), "hittest.log"),
+        JSON.stringify(entry) + "\n", () => {});
+    } catch (_) {}
+  };
   const tick = () => {
     let cadence = macHittest.FAR_MS;
     if (win && !win.isDestroyed() && win.isVisible()) {
@@ -182,9 +199,13 @@ function startMacHitTester() {
         // ignoring, so a fast approach must pre-arm from further out.
         const travel = lastX === null ? 0 : Math.hypot(p.x - lastX, p.y - lastY);
         lastX = p.x; lastY = p.y;
-        const decision = screenShapeDecision(p.x, p.y, macHittest.armMargin(travel));
+        const margin = macHittest.armMargin(travel);
+        const decision = screenShapeDecision(p.x, p.y, margin);
         macPollOver = decision.near; // the halo pre-arms interactivity
         cadence = decision.cadence;
+        if (trace) traceLine({ t: Date.now(), x: p.x, y: p.y, over: decision.over,
+          near: decision.near, margin, cadence, rendererOver: macRendererOver,
+          held: macHeld, ignoring: macIgnoring, rects: lastShape.length });
       } catch (_) { macPollOver = false; }
       macRecompute();
     }
@@ -256,6 +277,87 @@ function updateDesktopBounds() {
 
 
 
+/* Native menu bar, rendered from the same spec as the in-app hamburger
+   (js/menu-spec.js). Commands flow main -> renderer over
+   claudeamp:menu-command into the renderer's MENU_COMMANDS map; state
+   (window visibility, mode, zoom, sign-in) flows renderer -> main over
+   claudeamp:menu-state and rebuilds the template so the native
+   checkmarks stay honest. On Windows/Linux the same template installs
+   with the menu bar hidden purely so the accelerators work. */
+const menuSpec = require("../js/menu-spec.js");
+let menuState = { windows: {}, mode: "chat", zoom: 1.5, termAvailable: false,
+  signedIn: false, account: "" };
+function sendMenuCommand(id) {
+  if (win && !win.isDestroyed()) win.webContents.send("claudeamp:menu-command", id);
+}
+function specMenu(name) {
+  return (menuSpec.find(section => section.menu === name) || { items: [] }).items;
+}
+function specItems(name) {
+  return specMenu(name).map(item => {
+    if (item.type === "separator") return { type: "separator" };
+    const built = { id: item.id, label: item.label, click: () => sendMenuCommand(item.id) };
+    if (item.accelerator) built.accelerator = item.accelerator;
+    if (item.kind === "check" || item.kind === "radio") {
+      built.type = "checkbox"; // checkbox even for radio: zoom/mode manage exclusivity
+      built.checked = item.kind === "radio"
+        ? (item.group === "zoom" ? "zoom-" + String(menuState.zoom) === item.id
+                                 : "mode-" + menuState.mode === item.id)
+        : !!menuState.windows[item.id.replace("toggle-", "")];
+    }
+    if (item.id === "toggle-win-term" || item.id === "mode-shell" || item.id === "show-terminal")
+      built.enabled = menuState.termAvailable;
+    return built;
+  });
+}
+function nativeMenuTemplate() {
+  const appItems = specItems("app");
+  const template = [];
+  template.push({
+    label: "ClaudeAmp",
+    submenu: process.platform === "darwin" ? [
+      ...appItems,
+      { type: "separator" },
+      // Hand-built instead of the stock application-menu role ON PURPOSE:
+      // that role inserts the macOS Services menu, which this app has no
+      // services for ("No Services Apply").
+      { role: "hide" }, { role: "hideOthers" }, { role: "unhide" },
+      { type: "separator" },
+      { label: "Quit ClaudeAmp", accelerator: "CmdOrCtrl+Q", click: () => sendMenuCommand("quit") },
+    ] : [
+      ...appItems,
+      { type: "separator" },
+      { label: "Quit ClaudeAmp", accelerator: "CmdOrCtrl+Q", click: () => sendMenuCommand("quit") },
+    ],
+  });
+  template.push({ label: "File", submenu: specItems("File") });
+  template.push({ role: "editMenu" });
+  template.push({ label: "View", submenu: specItems("View") });
+  if (menuState.signedIn) template.push({
+    label: "Account",
+    submenu: [{ label: menuState.account || "Signed in", enabled: false }, ...specItems("Account")],
+  });
+  template.push({ role: "windowMenu" });
+  template.push({ label: "Help", submenu: specItems("Help") });
+  return template;
+}
+function applyNativeMenu() {
+  try { Menu.setApplicationMenu(Menu.buildFromTemplate(nativeMenuTemplate())); } catch (_) {}
+}
+ipcMain.on("claudeamp:menu-state", (event, state) => {
+  if (!win || win.isDestroyed() || event.sender !== win.webContents) return;
+  if (!state || typeof state !== "object") return;
+  menuState = {
+    windows: state.windows && typeof state.windows === "object" ? state.windows : {},
+    mode: state.mode === "shell" ? "shell" : "chat",
+    zoom: Number(state.zoom) || 1.5,
+    termAvailable: !!state.termAvailable,
+    signedIn: !!state.signedIn,
+    account: typeof state.account === "string" ? state.account.slice(0, 120) : "",
+  };
+  applyNativeMenu();
+});
+
 function createWindow(port) {
   const area = desktopBounds();
   readyToShow = false;
@@ -297,14 +399,18 @@ function createWindow(port) {
       autoplayPolicy: "document-user-activation-required",
     },
   });
+  applyNativeMenu();
+  win.setMenuBarVisibility(false); // hamburger stays the visible UI off-mac; accelerators still fire
   if (process.platform === "darwin") {
-    Menu.setApplicationMenu(Menu.buildFromTemplate([
-      { role: "appMenu" }, { role: "editMenu" }, { role: "windowMenu" },
-    ]));
-  } else {
-    Menu.setApplicationMenu(null);
+    app.setAboutPanelOptions({ applicationName: "ClaudeAmp", applicationVersion: app.getVersion() });
+    app.dock?.setMenu(Menu.buildFromTemplate(
+      (menuSpec.find(section => section.menu === "dock") || { items: [] }).items.map(item =>
+        item.type === "separator" ? { type: "separator" }
+          : { label: item.label, click: () => sendMenuCommand(item.id) })));
+    // The desktop overlay follows the user across Spaces instead of living
+    // only on the Space it launched in; never over full-screen apps.
+    win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: false });
   }
-  win.setMenuBarVisibility(false);
   win.setIgnoreMouseEvents(true);
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https:\/\//i.test(url)) shell.openExternal(url);

@@ -274,6 +274,11 @@ test("main menu is text-only with right-aligned state marks and footer account a
   assert.doesNotMatch(css, /\.w95-menu \.mi\.checked::before/);
   assert.ok(menuItems.indexOf('{ label: "About ClaudeAmp..."') < menuItems.indexOf("...accountItems"));
   assert.ok(menuItems.indexOf("...accountItems") < menuItems.indexOf('{ label: "Quit ClaudeAmp"'));
+  // Both menu renderings dispatch through one command map, and the
+  // preload carries the two menu channels.
+  assert.match(mainMenu, /runMenuCommand\("welcome"\)/);
+  assert.match(preload, /onMenuCommand/);
+  assert.match(preload, /setMenuState/);
 });
 
 test("user-facing provider language remains Model rather than Brain", () => {

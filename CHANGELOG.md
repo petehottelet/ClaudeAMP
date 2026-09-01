@@ -24,6 +24,18 @@ the `package.json` version, which CI requires to agree with `js/version.js`.
   with its close button still gets their terminal opened.
 
 ### Added
+- macOS: a native menu bar mirroring the in-app menu - ClaudeAmp, File,
+  Edit, View, Account (when signed in), Window, and Help, with keyboard
+  shortcuts (Cmd+1-7 toggle windows, Cmd+, opens Settings, Cmd+0/=/-
+  drive zoom) and checkmarks that track the app live. One spec
+  (js/menu-spec.js) drives both renderings so they cannot drift; there
+  is no Services item. The same shortcuts work on Windows and Linux
+  with the bar hidden.
+- macOS: a Dock menu (Play/Pause, Next, Previous, Show Terminal), a
+  correct native About panel, and the desktop overlay now follows you
+  across Spaces (never over full-screen apps).
+- macOS: CLAUDEAMP_HITTEST_TRACE=1 logs click-through decisions to
+  userData/hittest.log for diagnosing missed clicks.
 - The claudeamp.com landing page lives in `site/` (Vercel serves it via
   `vercel.json`): the wide logo and interface screenshot above the
   fold, the app's own palette, and download links.
