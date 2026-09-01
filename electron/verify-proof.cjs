@@ -41,7 +41,7 @@ async function runVerifyProof(window) {
         columns: grid ? getComputedStyle(grid).gridTemplateColumns : '',
         rects,
       };
-      try { localStorage.setItem('claudeamp.onboarding.setup.v1', 'done'); } catch (_) {}
+      try { localStorage.setItem('claudeamp.onboarding.setup.v2', 'done'); } catch (_) {}
       const overlay = document.getElementById('welcome-modern');
       if (overlay) overlay.hidden = true;
       const tip = document.getElementById('menu-onboarding');
@@ -529,7 +529,7 @@ async function runVerifyProof(window) {
         const settings = JSON.parse(localStorage.getItem('claudeamp.settings') || '{}');
         settings.chatMode = 'chat'; settings.zoom = 1; settings.zoomV5 = true;
         localStorage.setItem('claudeamp.settings', JSON.stringify(settings));
-        localStorage.setItem('claudeamp.onboarding.setup.v1', 'done');
+        localStorage.setItem('claudeamp.onboarding.setup.v2', 'done');
         // This reload specifically verifies restored terminal geometry. Keep
         // the separate menu-tip onboarding from moving only one dock group.
         localStorage.setItem('claudeamp.onboarding.menu.v2', 'done');

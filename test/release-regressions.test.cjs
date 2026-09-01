@@ -66,6 +66,13 @@ test("welcome music services remain three stacked radio choices", () => {
   assert.match(proofs, /welcomeMusicChoicesStacked/);
 });
 
+test("live verification bypasses the current onboarding screen before reload", () => {
+  const setupKey = app.match(/const SETUP_KEY = "([^"]+)"/)?.[1];
+  assert.ok(setupKey, "app must define an onboarding setup key");
+  assert.ok(proofs.includes(`localStorage.setItem('${setupKey}', 'done')`));
+  assert.doesNotMatch(proofs, /claudeamp\.onboarding\.setup\.v1/);
+});
+
 test("real terminal remains packaged, reachable, and covered by verification", () => {
   assert.match(html, /id="win-term"/);
   assert.match(app, /label:\s*"Terminal"/);

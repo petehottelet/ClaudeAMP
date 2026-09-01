@@ -1,5 +1,5 @@
 <div align="center">
-  <p><img src="docs/claudeamp-logo.png" alt="ClaudeAmp" width="720"></p>
+  <p><img src="docs/claudeamp-logo.png" alt="ClaudeAmp desktop AI terminal for Claude Code, OpenAI Codex, and Ollama" width="720"></p>
 
   <p>
     <strong>A classically-styled terminal interface for Claude Code, OpenAI Codex, and Ollama.</strong><br>
@@ -7,17 +7,23 @@
   </p>
 
   <p>
-    <img src="assets/badges/version.svg" alt="Version 1.7.1">
+    <a href="https://github.com/petehottelet/claudeamp/releases/latest"><img src="assets/badges/version.svg" alt="ClaudeAmp version 1.7.1"></a>
     <img src="assets/badges/verify.svg" alt="Local verification passed">
     <img src="assets/badges/platforms.svg" alt="Desktop: Windows, macOS, and Linux">
     <a href="LICENSE"><img src="assets/badges/license.svg" alt="License: MIT"></a>
+  </p>
+
+  <p>
+    <a href="https://www.claudeamp.com/download"><strong>Download for Windows, macOS, and Linux</strong></a>
+    ·
+    <a href="https://github.com/petehottelet/claudeamp/releases/latest">Release notes</a>
   </p>
 </div>
 
 ![ClaudeAmp interface with terminal, playlist, equalizer, usage monitor, and glyph-rain visualization](docs/claudeamp-interface.png)
 
 **ClaudeAmp is a classically-styled terminal interface** for Claude Code,
-OpenAI Codex, and Ollama on Windows and MacOS. Six draggable, snapping,
+OpenAI Codex, and Ollama on Windows, macOS, and Linux. Six draggable, snapping,
 windowshade-able windows live on a transparent standalone desktop surface: a main deck whose transport
 plays a built-in catalog of official 30-second iTunes previews, local digital
 music, direct audio streams, YouTube embeds, and Spotify Connect, an
@@ -89,7 +95,7 @@ npm run dist:mac          # macOS .dmg + .zip (arm64 and x64)
 npm run dist:linux        # Linux AppImage
 ```
 
-On Linux, download the AppImage from the Releases page, `chmod +x` it, and
+On Linux, download the AppImage from the [Releases page](https://github.com/petehottelet/claudeamp/releases/latest), `chmod +x` it, and
 run it — click-through window shaping uses the same native region path as
 Windows.
 
@@ -115,7 +121,7 @@ chat window outright, auto-launching the CLI for your selected provider.
 Tagged releases (`git tag v1.7.1 && git push origin v1.7.1`) build the installers
 automatically via GitHub Actions and attach them to the GitHub release, so
 users pick `ClaudeAmp-Setup-<version>.exe` or `ClaudeAmp-<version>-<arch>.dmg`
-from the same Releases page.
+from the same [Releases page](https://github.com/petehottelet/claudeamp/releases/latest).
 
 **Easiest macOS install** — one line in Terminal, no Gatekeeper dialogs:
 
