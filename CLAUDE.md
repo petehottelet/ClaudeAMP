@@ -1,5 +1,18 @@
 # ClaudeAmp — instructions for Claude
 
+## Repository metadata (GitHub About sidebar — restore after any recreation)
+
+GitHub's About description, website, and topics live only in repo
+settings, not in git. If the repository is ever recreated, re-enter
+these in the About panel (they mirror `package.json`):
+
+- Description: `A classically-styled terminal interface for Claude
+  Code, OpenAI Codex, and Ollama. For Windows, macOS, and Linux.`
+- Website: `https://www.claudeamp.com` (hosted on Vercel — independent
+  of this repository)
+- Topics: `ai-chat`, `claude-code`, `codex-cli`, `electron`, `ollama`,
+  `terminal`, `desktop-app`, `music-player`
+
 ## Attribution: never add yourself as a contributor
 
 Claude must NEVER appear as a contributor on this repository (or any of
