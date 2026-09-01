@@ -1,0 +1,23 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "",
+  "buildCommand": "",
+  "outputDirectory": ".",
+  "redirects": [
+    {
+      "source": "/install",
+      "destination": "https://raw.githubusercontent.com/petehottelet/claudeamp/main/scripts/install.sh",
+      "permanent": false
+    },
+    {
+      "source": "/download",
+      "destination": "https://github.com/petehottelet/claudeamp/releases/latest",
+      "permanent": false
+    },
+    {
+      "source": "/(.*)",
+      "destination": "https://github.com/petehottelet/claudeamp",
+      "permanent": false
+    }
+  ]
+}

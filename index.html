@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Every host the renderer touches, and nothing else. script-src admits the
+     YouTube IFrame API pair; connect-src the three direct model APIs (CLI and
+     Ollama chat go through the same-origin bridge); media-src stays wide
+     because previews stream from Apple CDNs and users can add arbitrary
+     http(s) stream URLs; blob: covers local files from the media library.
+     If media/embeds/chat ever break, this tag is the first thing to remove -
+     nothing else references it. -->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self' https://www.youtube.com https://s.ytimg.com;
+  style-src 'self' 'unsafe-inline';
+  img-src 'self' data: blob: https:;
+  media-src 'self' blob: data: https: http:;
+  font-src 'self' data:;
+  connect-src 'self' https://api.anthropic.com https://api.openai.com https://generativelanguage.googleapis.com;
+  frame-src https://www.youtube.com https://www.youtube-nocookie.com;
+  object-src 'none';
+  base-uri 'self';
+  form-action 'self'">
+<title>ClaudeAmp</title>
+<link rel="icon" href="assets/claw-icon.ico">
+<link rel="stylesheet" href="css/skin.css">
+<script src="js/native.js"></script>
+</head>
+<body>
+<svg class="filter-defs" aria-hidden="true" width="0" height="0">
+  <!-- Fine mosaic: sample one point per ~2px cell, dilate to fill the
+       cell (half the previous size for more detail), then crush to a
+       64-colour palette (4 R x 4 G x 4 B). -->
+  <filter id="indexed-256" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+    <feFlood x="0" y="0" width="1" height="1"/>
+    <feComposite width="2" height="2"/>
+    <feTile result="grid"/>
+    <feComposite in="SourceGraphic" in2="grid" operator="in"/>
+    <feMorphology operator="dilate" radius="1"/>
+    <feComponentTransfer>
+      <feFuncR type="discrete" tableValues="0 .333 .667 1"/>
+      <feFuncG type="discrete" tableValues="0 .333 .667 1"/>
+      <feFuncB type="discrete" tableValues="0 .333 .667 1"/>
+    </feComponentTransfer>
+  </filter>
+</svg>
+<div id="desktop">
+
+  <!-- ============================= MAIN WINDOW ============================= -->
+  <div class="wa-window" id="win-main" data-w="275" data-h="125">
+    <div class="titlebar">
+      <div class="tb-menu" title="ClaudeAmp menu"></div>
+      <div class="tb-ridge left"></div>
+      <div class="tb-text">CLAUDEAMP</div>
+      <div class="tb-ridge right"></div>
+      <button class="tb-btn tb-min" title="Minimize"></button>
+      <button class="tb-btn tb-shade" title="Windowshade"></button>
+      <button class="tb-btn tb-close" title="Close"></button>
+    </div>
+    <div class="onboarding-tip" id="menu-onboarding" role="status" hidden>
+      <span class="onboarding-arrow" aria-hidden="true"></span>
+      <button class="onboarding-close" type="button" aria-label="Dismiss tip">×</button>
+      <strong>START HERE</strong>
+      <span id="onboarding-text">Open this menu to authenticate your CLI and find additional options.</span>
+    </div>
+    <div class="win-body main-body">
+      <div class="clutterbar" id="clutterbar">
+        <span data-act="options" title="Options">O</span>
+        <span data-act="about"   title="About ClaudeAmp">A</span>
+        <span data-act="info"    title="Toggle time / token display">I</span>
+        <span data-act="double"  title="Toggle double size">D</span>
+        <span data-act="viz"     title="Toggle usage monitor">V</span>
+      </div>
+      <div class="lcd-panel"></div>
+      <div class="playstate" id="playstate"></div>
+      <canvas id="cv-time"   width="66"  height="13"></canvas>
+      <canvas id="cv-vis"    width="76"  height="16" title="Click to switch visualization"></canvas>
+      <canvas id="cv-ticker" width="147" height="6"></canvas>
+      <canvas id="cv-info"   width="158" height="12"></canvas>
+
+      <div class="hslider" id="sl-volume" title="Volume">
+        <div class="hslider-groove"></div><div class="hslider-thumb"></div>
+      </div>
+      <div class="hslider" id="sl-balance" title="Balance: analytical / creative Claude">
+        <div class="hslider-groove"></div><div class="hslider-thumb"></div>
+      </div>
+
+      <button class="winbtn" id="btn-eq" title="Toggle equalizer"><b class="lamp"></b>EQ</button>
+      <button class="winbtn" id="btn-pl" title="Toggle playlist"><b class="lamp"></b>PL</button>
+
+      <div class="hslider seekbar" id="sl-seek" title="Seek">
+        <div class="hslider-thumb"></div>
+      </div>
+
+      <div class="transport">
+        <button class="tbtn" id="t-prev"  title="Previous track"><i class="g-prev"></i></button>
+        <button class="tbtn" id="t-play"  title="Play"><i class="g-play"></i></button>
+        <button class="tbtn" id="t-pause" title="Pause"><i class="g-pause"></i></button>
+        <button class="tbtn" id="t-stop"  title="Stop"><i class="g-stop"></i></button>
+        <button class="tbtn" id="t-next"  title="Next track"><i class="g-next"></i></button>
+      </div>
+      <button class="tbtn eject" id="t-eject" title="Open audio files"><i class="g-eject"></i></button>
+
+      <button class="togglebtn" id="btn-shuffle" title="Shuffle tracks"><b class="lamp"></b>SHUFFLE</button>
+      <button class="togglebtn" id="btn-repeat"  title="Repeat current track"><b class="lamp"></b><i class="g-loop"></i></button>
+    </div>
+  </div>
+
+  <!-- ============================= EQUALIZER ============================= -->
+  <div class="wa-window" id="win-eq" data-w="275" data-h="124">
+    <div class="titlebar">
+      <div class="tb-menu"></div>
+      <div class="tb-ridge left"></div>
+      <div class="tb-text">CLAUDEAMP EQUALIZER</div>
+      <div class="tb-ridge right"></div>
+      <button class="tb-btn tb-shade" title="Windowshade"></button>
+      <button class="tb-btn tb-close" title="Close"></button>
+    </div>
+    <div class="win-body eq-body">
+      <button class="winbtn" id="eq-on"   title="EQ settings applied to requests"><b class="lamp"></b>ON</button>
+      <button class="winbtn" id="eq-auto" title="Reset to flat"><b class="lamp"></b>AUTO</button>
+      <button class="winbtn" id="eq-presets" title="Personality presets">PRESETS</button>
+      <canvas id="cv-eqgraph" width="113" height="19"></canvas>
+      <canvas id="cv-eqface"  width="275" height="108"></canvas>
+      <!-- vertical slider thumbs are generated by JS -->
+    </div>
+  </div>
+
+  <!-- ============================= USAGE MONITOR ============================= -->
+  <div class="wa-window" id="win-usage" data-w="275" data-h="118">
+    <div class="titlebar">
+      <div class="tb-menu"></div>
+      <div class="tb-ridge left"></div>
+      <div class="tb-text">USAGE MONITOR</div>
+      <div class="tb-ridge right"></div>
+      <button class="tb-btn tb-shade" title="Windowshade"></button>
+      <button class="tb-btn tb-close" title="Close"></button>
+    </div>
+    <div class="win-body usage-body">
+      <canvas id="cv-usage"    width="251" height="58" title="Tokens per turn"></canvas>
+      <canvas id="cv-usetext"  width="251" height="24"></canvas>
+    </div>
+  </div>
+
+  <!-- ============================= VISUALIZATION + MUSIC SEARCH ============================= -->
+  <div class="wa-window pl-chrome" id="win-mb" data-w="275" data-h="105" data-resize="1">
+    <div class="titlebar pl-titlebar">
+      <div class="tb-ridge left"></div>
+      <div class="tb-text">VISUALIZATION</div>
+      <div class="tb-ridge right"></div>
+      <button class="tb-btn tb-shade" title="Windowshade"></button>
+      <button class="tb-btn tb-close" title="Close"></button>
+    </div>
+    <div class="pl-frame mb-frame">
+      <form class="yt-searchbar" id="yt-search-form" role="search">
+        <button class="mb-tool" id="mb-reset-button" type="button"
+          aria-label="Back to visualization" title="Back to visualization" hidden></button>
+        <select id="music-search-source" aria-label="Search source" title="Choose music search source">
+          <option value="apple">iTUNES</option>
+          <option value="youtube">YOUTUBE</option>
+          <option value="spotify">SPOTIFY</option>
+        </select>
+        <input id="yt-search-input" type="search" maxlength="120" autocomplete="off"
+          aria-label="Search for a song" placeholder="SEARCH FOR A SONG">
+        <button class="mb-tool" id="yt-search-button" type="submit" aria-label="Search" title="Search"></button>
+      </form>
+      <div class="mb-stage">
+        <div id="yt-wrap" class="indexed-video"><div id="yt-holder"></div><div id="yt-guard" aria-hidden="true"></div></div>
+        <canvas id="fx-canvas" width="152" height="84" hidden></canvas>
+        <div id="yt-results" hidden role="list" aria-live="polite"></div>
+        <div class="amp-scroll" id="mb-results-scroll" aria-hidden="true">
+          <button class="amp-scroll-btn up" type="button" tabindex="-1" title="Scroll up"></button>
+          <div class="amp-scroll-track"><div class="amp-scroll-thumb"></div></div>
+          <button class="amp-scroll-btn down" type="button" tabindex="-1" title="Scroll down"></button>
+        </div>
+        <div id="yt-offline" hidden>VISUALIZATION OFFLINE<br>YOUTUBE UNREACHABLE</div>
+        <div id="local-audio-screen" hidden>
+          <div class="local-audio-mark" aria-hidden="true"></div>
+          <div class="local-audio-copy">
+            <div class="local-audio-source" id="local-audio-source">LOCAL AUDIO</div>
+            <div class="local-audio-title" id="local-audio-title">NO TRACK LOADED</div>
+            <div class="local-audio-meta" id="local-audio-meta">MP3 / WAV / OGG / FLAC</div>
+          </div>
+          <div class="local-vu" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        </div>
+        <a class="itunes-store-link" id="itunes-store-link" href="#" target="_blank" rel="noopener" hidden>VIEW IN ITUNES</a>
+      </div>
+    </div>
+    <div class="pl-bottom mb-bottom">
+      <button class="mb-tool fx-pick" id="fx-pick" type="button"
+        title="Filtered video, HD video, or a pixel FX visualization">VIDEO</button>
+      <span class="mb-ticker" id="mb-ticker" aria-hidden="true"><i id="mb-ticker-inner"></i></span>
+      <span class="mb-note" id="mb-note" hidden>youtube embed player</span>
+      <div class="pl-grip" title="Resize"></div>
+    </div>
+  </div>
+
+  <!-- ============================= PLAYLIST ============================= -->
+  <div class="wa-window pl-chrome" id="win-pl" data-w="480" data-h="150" data-resize="1">
+    <div class="titlebar pl-titlebar">
+      <div class="tb-menu" id="pl-menu" title="Playlist menu"></div>
+      <div class="tb-ridge left"></div>
+      <div class="tb-text">CLAUDEAMP PLAYLIST</div>
+      <div class="tb-ridge right"></div>
+      <button class="tb-btn tb-shade" title="Windowshade"></button>
+      <button class="tb-btn tb-close" title="Close"></button>
+    </div>
+    <div class="pl-frame">
+      <ul class="pl-list" id="pl-list" aria-label="ClaudeAmp playlist"></ul>
+      <div class="amp-scroll" id="pl-scroll" aria-hidden="true">
+        <button class="amp-scroll-btn up" type="button" tabindex="-1" title="Scroll up"></button>
+        <div class="amp-scroll-track"><div class="amp-scroll-thumb"></div></div>
+        <button class="amp-scroll-btn down" type="button" tabindex="-1" title="Scroll down"></button>
+      </div>
+    </div>
+    <div class="pl-bottom">
+      <button class="plbtn" id="pl-add"  title="Add files, folder, URL, or playlist">ADD</button>
+      <button class="plbtn" id="pl-rem"  title="Remove or crop tracks">REM</button>
+      <button class="plbtn" id="pl-sel"  title="Select, jump, or rename">SEL</button>
+      <button class="plbtn" id="pl-misc" title="Playlist files and sorting">MISC</button>
+      <button class="plbtn" id="pl-radio" title="Load a 90s station playlist">RADIO</button>
+      <div class="pl-mini">
+        <button class="m-prev"  data-m="prev"  title="Previous"></button>
+        <button class="m-play"  data-m="play"  title="Play"></button>
+        <button class="m-pause" data-m="pause" title="Pause"></button>
+        <button class="m-stop"  data-m="stop"  title="Stop"></button>
+        <button class="m-next"  data-m="next"  title="Next"></button>
+        <button class="m-eject" data-m="eject" title="Open audio files"></button>
+      </div>
+      <span class="pl-time" id="pl-time">0:00/0:00</span>
+      <div class="pl-grip" title="Resize"></div>
+    </div>
+  </div>
+
+  <!-- ============================= CHAT ============================= -->
+  <div class="wa-window pl-chrome" id="win-chat" data-w="480" data-h="290" data-resize="1">
+    <div class="titlebar pl-titlebar">
+      <div class="tb-ridge left"></div>
+      <div class="tb-text">CLAUDEAMP CHAT</div>
+      <div class="tb-ridge right"></div>
+      <button class="tb-btn tb-shade" title="Windowshade"></button>
+      <button class="tb-btn tb-close" title="Close"></button>
+    </div>
+    <div class="pl-frame">
+      <div class="chat-log" id="chat-log"></div>
+      <div class="amp-scroll" id="chat-scroll" aria-hidden="true">
+        <button class="amp-scroll-btn up" type="button" tabindex="-1" title="Scroll up"></button>
+        <div class="amp-scroll-track"><div class="amp-scroll-thumb"></div></div>
+        <button class="amp-scroll-btn down" type="button" tabindex="-1" title="Scroll down"></button>
+      </div>
+    </div>
+    <div class="pl-bottom chat-bottom">
+      <div class="chat-entry">
+        <div class="chat-attachments" id="chat-attachments" hidden></div>
+        <textarea id="chat-input" rows="3" autocomplete="off" spellcheck="false"
+          placeholder="TYPE A MESSAGE... [ENTER] SENDS, [SHIFT+ENTER] NEW LINE, /CLEAR STARTS OVER"></textarea>
+      </div>
+      <div class="chat-actions">
+        <button class="plbtn" id="chat-send" title="Send">SEND</button>
+        <button class="plbtn" id="chat-stop" title="Stop generating [ESC]">STOP</button>
+        <button class="plbtn" id="chat-conv" title="Conversations">CONV</button>
+      </div>
+      <div class="pl-grip" title="Resize"></div>
+    </div>
+  </div>
+
+  <!-- ============================= TERMINAL ============================= -->
+  <div class="wa-window pl-chrome hidden" id="win-term" data-w="480" data-h="220" data-resize="1">
+    <div class="titlebar pl-titlebar">
+      <div class="tb-ridge left"></div>
+      <div class="tb-text">CLAUDEAMP TERMINAL</div>
+      <div class="tb-ridge right"></div>
+      <button class="tb-btn tb-shade" title="Windowshade"></button>
+      <button class="tb-btn tb-close" title="Close"></button>
+    </div>
+    <div class="pl-frame term-frame">
+      <div id="term-holder"></div>
+      <div class="amp-scroll" id="term-scroll" aria-label="Terminal scrollbar">
+        <button class="amp-scroll-btn up" type="button" aria-label="Scroll terminal up"></button>
+        <div class="amp-scroll-track"><div class="amp-scroll-thumb"></div></div>
+        <button class="amp-scroll-btn down" type="button" aria-label="Scroll terminal down"></button>
+      </div>
+      <div id="term-note" class="term-note" hidden></div>
+    </div>
+    <div class="pl-bottom">
+      <div class="pl-grip" title="Resize"></div>
+    </div>
+  </div>
+
+  <!-- ============================= WIN95 CONTEXT MENU ============================= -->
+  <div class="w95-menu" id="ctxmenu" hidden></div>
+  <input class="file-picker" id="file-audio" type="file" multiple
+         accept="audio/*,.mp3,.wav,.wave,.ogg,.oga,.opus,.m4a,.aac,.flac,.webm">
+  <input class="file-picker" id="file-folder" type="file" multiple webkitdirectory directory
+         accept="audio/*,.mp3,.wav,.wave,.ogg,.oga,.opus,.m4a,.aac,.flac,.webm">
+  <input class="file-picker" id="file-playlist" type="file" multiple
+         accept=".m3u,.m3u8,.pls,.json,audio/*">
+
+
+  <!-- ============================= OPTIONS DIALOG ============================= -->
+  <div class="w95-dialog" id="dlg-embed" hidden>
+    <div class="w95-title"><span>Embed Check</span><button class="w95-x" data-close>×</button></div>
+    <div class="w95-body">
+      <pre class="embed-report" id="embed-report">READY.</pre>
+      <p class="w95-note">Tests every YouTube playlist entry in a hidden player and
+      lists the ones YouTube refuses to embed. Copy the list to request replacements.</p>
+      <div class="w95-row">
+        <button class="w95-btn" id="embed-copy">Copy list</button>
+        <button class="w95-btn" data-close>Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="w95-dialog legal-dialog" id="dlg-legal" hidden>
+    <div class="w95-title"><span>Details, Legal &amp; Privacy</span><button class="w95-x" data-close>×</button></div>
+    <div class="w95-body legal-body">
+      <p class="legal-h">Privacy &amp; your data</p>
+      <p>ClaudeAmp has no backend of its own &mdash; it runs entirely in your browser (or the local
+      desktop shell) and collects <b>no analytics, no telemetry, and no accounts</b>. API keys you
+      enter live only in <b>this browser's <code>localStorage</code></b> and are never sent to a
+      ClaudeAmp server (there isn't one), so use personal keys you can revoke and clear them any time
+      by emptying the fields and saving. When you pick an <b>API model</b> (Claude, OpenAI, Gemini)
+      your messages go straight from your browser to that provider, handled under its own terms and
+      privacy policy. When you pick a <b>subscription model</b> (Claude Code / Codex) no key is
+      needed: the desktop app relays chat to the <code>claude</code> / <code>codex</code> CLI already
+      installed on your machine over a <b>loopback-only</b> local bridge, and that CLI &mdash; not
+      ClaudeAmp &mdash; handles auth; <b>Ollama</b> models are likewise discovered from your
+      loopback-only local service. Music plays through YouTube's embedded IFrame player, so that
+      playback is subject to <b>YouTube's / Google's</b> terms and privacy policy.</p>
+
+      <p class="legal-h">CLI workspace access</p>
+      <p><b>Read only</b> is the safe default &mdash; the CLI can look but not touch. Enable <b>Allow
+      workspace edits</b> only when you want the selected CLI to create or change files in the
+      workspace folder you choose with <b>Workspace...</b>.</p>
+
+      <p class="legal-h">The EQ</p>
+      <p>The left <b>MODEL</b> slider chooses which model in the selected provider's family answers;
+      the other bands shape effort, thinking, length and personality.</p>
+
+      <p class="legal-h">Legal &amp; affiliation</p>
+      <p>ClaudeAmp is a from-scratch homage &mdash; <b>not affiliated with, endorsed by, or sponsored
+      by</b> Winamp, Nullsoft, or AOL, and using <b>no original skin assets</b> (every pixel of chrome
+      is hand-drawn). It is likewise not affiliated with Anthropic, OpenAI, Google, or YouTube; those
+      names and CLIs belong to their respective owners. Released under the <b>MIT License</b> and
+      provided <b>&ldquo;as is&rdquo;</b>, without warranty of any kind. Some interface icons are
+      <b>Font Awesome Free</b> (CC BY 4.0). Source:
+      <a href="https://github.com/petehottelet/claudeamp" target="_blank" rel="noopener">github.com/petehottelet/claudeamp</a>.</p>
+      <div class="w95-row"><button class="w95-btn" data-close>OK</button></div>
+    </div>
+  </div>
+
+  <!-- ============================= ADD URL DIALOG ============================= -->
+  <div class="w95-dialog" id="dlg-addtrack" hidden>
+    <div class="w95-title"><span>Add URL / Stream</span><button class="w95-x" data-close>×</button></div>
+    <div class="w95-body">
+      <label for="track-url">YouTube URL, video ID, or audio stream URL</label>
+      <input id="track-url" type="text" placeholder="https://...">
+      <label for="track-title">Title (optional)</label>
+      <input id="track-title" type="text" placeholder="Artist - Song">
+      <p class="w95-note">YouTube links use the embedded player. Direct HTTP audio
+      streams use the local audio deck. Unsupported or blocked sources are marked in the playlist.</p>
+      <div class="w95-row">
+        <button class="w95-btn" id="track-ok">OK</button>
+        <button class="w95-btn" data-close>Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================= PLAYLIST NAME DIALOG ============================= -->
+  <div class="w95-dialog compact-dialog" id="dlg-playlist-name" hidden>
+    <div class="w95-title"><span id="playlist-name-title">Save Playlist</span><button class="w95-x" data-close>×</button></div>
+    <div class="w95-body">
+      <label for="playlist-name">Playlist name</label>
+      <input id="playlist-name" type="text" maxlength="64" placeholder="My Playlist">
+      <div class="w95-row">
+        <button class="w95-btn" id="playlist-name-ok">OK</button>
+        <button class="w95-btn" data-close>Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================= SAVED PLAYLISTS DIALOG ============================= -->
+  <div class="w95-dialog" id="dlg-playlists" hidden>
+    <div class="w95-title"><span>ClaudeAmp Playlists</span><button class="w95-x" data-close>×</button></div>
+    <div class="w95-body">
+      <div class="saved-playlists" id="saved-playlists" role="listbox" tabindex="0"></div>
+      <p class="w95-note">Saved playlists keep local music in ClaudeAmp's private browser library.</p>
+      <div class="w95-row">
+        <button class="w95-btn" id="playlist-load">Load</button>
+        <button class="w95-btn" id="playlist-delete">Delete</button>
+        <button class="w95-btn" data-close>Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================= JUMP TO TRACK DIALOG ============================= -->
+  <div class="w95-dialog" id="dlg-jump" hidden>
+    <div class="w95-title"><span>Jump to Track</span><button class="w95-x" data-close>×</button></div>
+    <div class="w95-body">
+      <label for="jump-query">Search playlist</label>
+      <input id="jump-query" type="text" autocomplete="off" placeholder="Artist or title">
+      <div class="jump-results" id="jump-results" role="listbox"></div>
+      <div class="w95-row">
+        <button class="w95-btn" id="jump-play">Play</button>
+        <button class="w95-btn" data-close>Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================= ABOUT DIALOG ============================= -->
+  <div class="w95-dialog about-dialog" id="dlg-about" hidden>
+    <div class="w95-title"><span>About ClaudeAmp</span><button class="w95-x" data-close>×</button></div>
+    <div class="w95-body">
+      <img class="about-logo" src="assets/claudeamp-logo-stacked.png" alt="CLAUDEAMP">
+      <p class="about-url"><a href="https://www.claudeamp.com" target="_blank" rel="noopener">WWW.CLAUDEAMP.COM</a></p>
+      <p class="about-tagline"><b>ClaudeAmp <span id="about-version"></span></b><br>
+         A classically-styled terminal interface for Claude Code, OpenAI Codex,
+         and Ollama. For Windows, macOS, and Linux.</p>
+      <p>Not affiliated with Winamp, Nullsoft, AOL, Anthropic, OpenAI, Google,
+         YouTube, or Ollama.</p>
+      <p class="about-credit">Created by <b>Pete Hottelet</b><br>
+        <a href="https://github.com/petehottelet/claudeamp" target="_blank" rel="noopener">GITHUB.COM/PETEHOTTELET/CLAUDEAMP</a>
+      </p>
+      <p class="w95-note">Tips: press ENTER to chat, ESC to stop a reply.
+         Drag windows anywhere - they snap together. Double-click a title bar
+         to roll a window up. Right-click for the menu. The EQ sliders tune
+         your AI: pick the model on the left, then shape how it thinks on
+         the bands.</p>
+      <div class="w95-row"><button class="w95-btn" data-close>OK</button></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===================== MODERN SETTINGS (full-window overlay) ===================== -->
+
+<!-- ============ FIRST-RUN WELCOME (modern overlay, same design language
+     as the Settings panel; liquid glass on macOS) ============ -->
+<div id="welcome-modern" class="modern-ui" hidden>
+  <main class="window" role="dialog" aria-modal="true" aria-labelledby="wm-title">
+    <header class="header">
+      <div class="brand">
+        <div class="app-icon" id="wm-icon" aria-hidden="true"></div>
+        <div>
+          <h1 id="wm-title">Welcome to ClaudeAmp</h1>
+          <p class="subtitle">The retro music player that runs your favorite LLM. Two quick choices and you're in.</p>
+        </div>
+      </div>
+      <button class="close" type="button" aria-label="Close" id="wm-close">×</button>
+    </header>
+
+    <div class="content">
+      <div id="wm-page1">
+      <section class="section">
+        <div class="section-head">
+          <h2 class="section-title"><span class="section-number">1.</span>How do you want to interface?</h2>
+          <p class="section-help">You can switch any time from the menu.</p>
+        </div>
+        <div class="provider-grid mode-grid">
+          <label class="choice-card">
+            <input type="radio" name="wm-mode" value="shell" checked>
+            <span class="radio" aria-hidden="true"></span>
+            <svg class="choice-icon" viewBox="0 0 64 64" aria-hidden="true"><rect x="7" y="10" width="50" height="44" rx="7" fill="none" stroke="#111827" stroke-width="4"/><path d="m16 24 9 8-9 8M31 42h16" fill="none" stroke="#111827" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span><span class="choice-name">Terminal Window</span>
+              <div class="choice-meta">Use your favorite CLI in a standard terminal window with a winamp-style theme</div></span>
+          </label>
+          <label class="choice-card">
+            <input type="radio" name="wm-mode" value="chat">
+            <span class="radio" aria-hidden="true"></span>
+            <svg class="choice-icon" viewBox="0 0 64 64" aria-hidden="true"><path d="M10 14h44v30H26l-11 9v-9h-5z" fill="none" stroke="#067647" stroke-width="4" stroke-linejoin="round"/><path d="M20 25h24M20 33h16" stroke="#067647" stroke-width="4" stroke-linecap="round"/></svg>
+            <span><span class="choice-name">The Chat Experience</span>
+              <div class="choice-meta">Connect to your favorite LLM and use a chat-style experience.</div></span>
+          </label>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <h2 class="section-title"><span class="section-number">2.</span>Where should the music play from?</h2>
+          <p class="section-help">The built-in playlists start with official 30-second iTunes previews.
+            YouTube can play full tracks when embedding is available; Spotify needs your own Premium
+            subscription and plays through the Spotify app.</p>
+        </div>
+        <div class="provider-grid music-grid">
+          <label class="choice-card">
+            <input type="radio" name="wm-music" value="itunes" checked>
+            <span class="radio" aria-hidden="true"></span>
+            <svg class="choice-icon" viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="itunes-wm" x1="10" y1="54" x2="52" y2="9" gradientUnits="userSpaceOnUse"><stop stop-color="#fb3b61"/><stop offset="1" stop-color="#9b45e8"/></linearGradient></defs><circle cx="32" cy="32" r="27" fill="url(#itunes-wm)"/><path d="M27 19v25a7 7 0 1 1-4-6.3V24l22-4v19a7 7 0 1 1-4-6.3V15z" fill="#fff"/></svg>
+            <span><span class="choice-name">iTunes <span class="choice-tag">(Free previews)</span></span>
+              <div class="choice-meta">Official 30-second samples — no account needed.</div></span>
+          </label>
+          <label class="choice-card">
+            <input type="radio" name="wm-music" value="youtube">
+            <span class="radio" aria-hidden="true"></span>
+            <svg class="choice-icon" viewBox="0 0 64 64" aria-hidden="true"><rect x="6" y="14" width="52" height="36" rx="9" fill="#ef4444"/><path d="m27 23 14 9-14 9z" fill="#fff"/></svg>
+            <span><span class="choice-name">YouTube <span class="choice-tag">(Free)</span></span>
+              <div class="choice-meta">Full tracks when available; some embeds are blocked.</div></span>
+          </label>
+          <label class="choice-card">
+            <input type="radio" name="wm-music" value="spotify">
+            <span class="radio" aria-hidden="true"></span>
+            <svg class="choice-icon" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="26" fill="#1DB954"/><path d="M19 26c9-3 19-2 27 3M21 34c7-2 15-1 21 3M23 41c5-1.5 11-.8 15 2" fill="none" stroke="#0b0b0b" stroke-width="4" stroke-linecap="round"/></svg>
+            <span><span class="choice-name">Spotify <span class="choice-tag">(Subscription)</span></span>
+              <div class="choice-meta">Most songs available — full remote control (Premium).</div></span>
+          </label>
+        </div>
+
+      </section>
+      </div>
+
+      <div id="wm-page2" hidden>
+        <div id="wm-model-steps">
+        <section class="section">
+          <div class="section-head">
+            <h2 class="section-title"><span class="section-number">3.</span>Choose your model</h2>
+            <p class="section-help">Which AI answers in the chat window. You can change it later in Settings.</p>
+          </div>
+          <select class="api-input" id="wm-provider" aria-label="Model provider">
+            <option value="claude-cli">Claude Code — your Claude subscription (no API key)</option>
+            <option value="codex-cli">Codex CLI — your ChatGPT subscription (no API key)</option>
+            <option value="claude">Claude API — Anthropic API key</option>
+            <option value="openai">OpenAI API — OpenAI API key</option>
+            <option value="gemini">Gemini API — Google AI API key</option>
+            <option value="ollama">Ollama — free local models on this machine</option>
+          </select>
+        </section>
+
+        <section class="section">
+          <div class="section-head">
+            <h2 class="section-title"><span class="section-number">4.</span><span id="wm-step4-title">Connect it</span></h2>
+            <p class="section-help" id="wm-step4-help"></p>
+          </div>
+          <div id="wm-key-row" hidden>
+            <div class="input-wrap">
+              <input class="api-input" id="wm-api-key" type="password" autocomplete="off" placeholder="API key">
+              <button class="eye" type="button" aria-label="Show or hide the API key" id="wm-key-eye">👁</button>
+            </div>
+          </div>
+          <div id="wm-ollama-row" class="connect-row" hidden>
+            <select class="api-input" id="wm-ollama-model" aria-label="Local Ollama model"></select>
+            <button class="secondary-btn" type="button" id="wm-ollama-refresh">Refresh</button>
+            <span class="svc-status" id="wm-ollama-status"></span>
+          </div>
+          <p class="section-help" id="wm-cli-note" hidden></p>
+        </section>
+      </div>
+
+        <section class="section" id="wm-music-connect" hidden>
+          <div class="section-head">
+            <h2 class="section-title"><span class="section-number" id="wm-music-num">5.</span>Connect your music</h2>
+            <p class="section-help" id="wm-music-connect-help"></p>
+          </div>
+          <div class="connect-row" id="wm-spotify-row" hidden>
+          <input class="api-input" id="wm-spotify-client" type="text" spellcheck="false"
+            autocomplete="off" placeholder="Spotify app Client ID">
+          <button class="secondary-btn" type="button" id="wm-spotify-connect">Connect Spotify…</button>
+          <button class="secondary-btn" type="button" id="wm-spotify-disconnect" hidden>Disconnect</button>
+          <span class="svc-status" id="wm-spotify-status">Not connected</span>
+        </div>
+                  <p class="section-help" id="wm-spotify-help" hidden>Create a free app at
+          developer.spotify.com/dashboard, give it the Redirect URI shown after you click
+          Connect, and paste its Client ID above. Playback needs Spotify Premium with the
+          Spotify app open on any device — ClaudeAmp acts as the remote control.</p>
+        </section>
+      </div>
+    </div>
+
+    <footer class="footer">
+      <button class="ghost" type="button" id="wm-back" hidden>Back</button>
+      <button class="primary" type="button" id="wm-start">Start ClaudeAmp</button>
+    </footer>
+  </main>
+</div>
+
+<div id="settings-modern" class="modern-ui" hidden>
+  <main class="window" role="dialog" aria-modal="true" aria-labelledby="sm-title">
+    <header class="header">
+      <div class="brand">
+        <div class="app-icon" id="sm-icon" aria-hidden="true"></div>
+        <div>
+          <h1 id="sm-title">ClaudeAmp Settings</h1>
+          <p class="subtitle">Configure model access, workspace permissions, and authentication</p>
+        </div>
+      </div>
+      <button class="close" type="button" aria-label="Close" id="sm-close">×</button>
+    </header>
+
+    <nav class="sm-tabs" id="sm-tabs" role="tablist">
+      <button class="sm-tab active" type="button" data-tab="model" role="tab" aria-selected="true">Model</button>
+      <button class="sm-tab" type="button" data-tab="signin" role="tab" aria-selected="false">Sign-in</button>
+      <button class="sm-tab" type="button" data-tab="workspace" role="tab" aria-selected="false">Workspace</button>
+      <button class="sm-tab" type="button" data-tab="music" role="tab" aria-selected="false">Music</button>
+    </nav>
+
+    <div class="content">
+      <div class="sm-tab-panel" data-panel="model">
+      <section class="section">
+        <div class="section-head">
+          <h2 class="section-title">Model Provider</h2>
+          <p class="section-help">Select the AI model provider you want to use.</p>
+        </div>
+        <div class="provider-grid">
+          <label class="choice-card">
+            <input type="radio" name="sm-provider" value="claude-cli">
+            <span class="radio" aria-hidden="true"></span>
+            <img class="choice-icon" alt="" src="assets/provider-icons/claudecode-color.svg">
+            <span><span class="choice-name">Claude Code</span><div class="choice-meta">(subscription)</div></span>
+          </label>
+          <label class="choice-card">
+            <input type="radio" name="sm-provider" value="codex-cli">
+            <span class="radio" aria-hidden="true"></span>
+            <img class="choice-icon" alt="" src="assets/provider-icons/codex-color.svg">
+            <span><span class="choice-name">Codex CLI</span><div class="choice-meta">(subscription)</div></span>
+          </label>
+          <label class="choice-card">
+            <input type="radio" name="sm-provider" value="ollama">
+            <span class="radio" aria-hidden="true"></span>
+            <img class="choice-icon" alt="" src="assets/provider-icons/ollama.svg">
+            <span><span class="choice-name">Ollama</span><div class="choice-meta">(local models)</div></span>
+          </label>
+          <label class="choice-card">
+            <input type="radio" name="sm-provider" value="claude">
+            <span class="radio" aria-hidden="true"></span>
+            <img class="choice-icon" alt="" src="assets/provider-icons/claude-color.svg">
+            <span><span class="choice-name">Claude</span><div class="choice-meta">API key</div></span>
+          </label>
+          <label class="choice-card">
+            <input type="radio" name="sm-provider" value="openai">
+            <span class="radio" aria-hidden="true"></span>
+            <img class="choice-icon" alt="" src="assets/provider-icons/openai.svg">
+            <span><span class="choice-name">OpenAI</span><div class="choice-meta">API key</div></span>
+          </label>
+          <label class="choice-card">
+            <input type="radio" name="sm-provider" value="gemini">
+            <span class="radio" aria-hidden="true"></span>
+            <img class="choice-icon" alt="" src="assets/provider-icons/gemini-color.svg">
+            <span><span class="choice-name">Gemini</span><div class="choice-meta">API key</div></span>
+          </label>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <h2 class="section-title">API Keys <span style="font-weight:500;color:var(--muted);font-size:14px">(optional)</span></h2>
+          <p class="section-help">Only needed for the API-key providers. Stored in this browser's localStorage.</p>
+        </div>
+        <div class="api-grid">
+          <label class="api-label" for="sm-key-claude">Anthropic API key</label>
+          <div class="input-wrap">
+            <input class="api-input" id="sm-key-claude" type="password" placeholder="sk-ant-…" autocomplete="off">
+            <button class="eye" type="button" aria-label="Show or hide Anthropic API key"><img alt="" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CiAgICAgIDxnIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzY0NzQ4YiIgc3Ryb2tlLXdpZHRoPSI0IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPgogICAgICA8cGF0aCBkPSJNOCAzMnM5LTE1IDI0LTE1IDI0IDE1IDI0IDE1LTkgMTUtMjQgMTVTOCAzMiA4IDMyWiIvPgogICAgICA8cGF0aCBkPSJNMjcgMjdhNyA3IDAgMCAwIDEwIDEwTTEwIDEwbDQ0IDQ0Ii8+CiAgICAgIDwvZz48L3N2Zz4="></button>
+          </div>
+          <label class="api-label" for="sm-key-openai">OpenAI API key</label>
+          <div class="input-wrap">
+            <input class="api-input" id="sm-key-openai" type="password" placeholder="sk-…" autocomplete="off">
+            <button class="eye" type="button" aria-label="Show or hide OpenAI API key"><img alt="" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CiAgICAgIDxnIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzY0NzQ4YiIgc3Ryb2tlLXdpZHRoPSI0IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPgogICAgICA8cGF0aCBkPSJNOCAzMnM5LTE1IDI0LTE1IDI0IDE1IDI0IDE1LTkgMTUtMjQgMTVTOCAzMiA4IDMyWiIvPgogICAgICA8cGF0aCBkPSJNMjcgMjdhNyA3IDAgMCAwIDEwIDEwTTEwIDEwbDQ0IDQ0Ii8+CiAgICAgIDwvZz48L3N2Zz4="></button>
+          </div>
+          <label class="api-label" for="sm-key-gemini">Google AI (Gemini) API key</label>
+          <div class="input-wrap">
+            <input class="api-input" id="sm-key-gemini" type="password" placeholder="AIza…" autocomplete="off">
+            <button class="eye" type="button" aria-label="Show or hide Gemini API key"><img alt="" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CiAgICAgIDxnIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzY0NzQ4YiIgc3Ryb2tlLXdpZHRoPSI0IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPgogICAgICA8cGF0aCBkPSJNOCAzMnM5LTE1IDI0LTE1IDI0IDE1IDI0IDE1LTkgMTUtMjQgMTVTOCAzMiA4IDMyWiIvPgogICAgICA8cGF0aCBkPSJNMjcgMjdhNyA3IDAgMCAwIDEwIDEwTTEwIDEwbDQ0IDQ0Ii8+CiAgICAgIDwvZz48L3N2Zz4="></button>
+          </div>
+        </div>
+        <div class="privacy"><a id="sm-legal">◈ More details, legal &amp; privacy</a></div>
+      </section>
+      </div>
+      <div class="sm-tab-panel" data-panel="signin" hidden>
+      <section class="section">
+        <div class="section-head">
+          <h2 class="section-title">Connection status</h2>
+          <p class="section-help">Whether each local CLI is installed and signed in.</p>
+        </div>
+        <div class="info-box">
+          <img class="info-icon" alt="" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CiAgICAgIDxjaXJjbGUgY3g9IjMyIiBjeT0iMzIiIHI9IjIzIiBmaWxsPSJub25lIiBzdHJva2U9IiMyNTYzZWIiIHN0cm9rZS13aWR0aD0iNCIvPgogICAgICA8cGF0aCBkPSJNMzIgMjh2MThNMzIgMTloLjEiIHN0cm9rZT0iIzI1NjNlYiIgc3Ryb2tlLXdpZHRoPSI1IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICAgIDwvc3ZnPg==">
+          <div class="info-lines" id="sm-info-lines"></div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <h2 class="section-title">Authentication</h2>
+          <p class="section-help">Sign in to the subscription CLIs in a secure terminal.</p>
+        </div>
+        <div class="auth-actions">
+          <button class="auth-btn" type="button" id="sm-claude-login">
+            <img class="btn-icon" alt="" src="assets/provider-icons/claudecode-color.svg">Claude Login…
+          </button>
+          <button class="auth-btn" type="button" id="sm-codex-login">
+            <img class="btn-icon" alt="" src="assets/provider-icons/codex-color.svg">Codex Login…
+          </button>
+          <button class="refresh-btn" type="button" id="sm-refresh">
+            <img class="btn-icon" alt="" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CiAgICAgIDxnIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzExMTgyNyIgc3Ryb2tlLXdpZHRoPSI0IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPgogICAgICA8cGF0aCBkPSJNNTAgMjJWMTFsLTYgNkEyMSAyMSAwIDAgMCAxMyAyN00xNCA0MnYxMWw2LTZhMjEgMjEgMCAwIDAgMzEtMTAiLz4KICAgICAgPC9nPjwvc3ZnPg==">Refresh Models
+          </button>
+        </div>
+        <div class="security-note">
+          <img alt="" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CiAgICAgIDxyZWN0IHg9IjE0IiB5PSIyOCIgd2lkdGg9IjM2IiBoZWlnaHQ9IjI3IiByeD0iNSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNjQ3NDhiIiBzdHJva2Utd2lkdGg9IjQiLz4KICAgICAgPHBhdGggZD0iTTIyIDI4di04YTEwIDEwIDAgMCAxIDIwIDB2OE0zMiAzOXY2IiBmaWxsPSJub25lIiBzdHJva2U9IiM2NDc0OGIiIHN0cm9rZS13aWR0aD0iNCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CiAgICA8L3N2Zz4=">
+          <span>These buttons open a secure terminal to sign in. ClaudeAmp detects completion automatically.</span>
+        </div>
+      </section>
+      </div>
+      <div class="sm-tab-panel" data-panel="workspace" hidden>
+      <section class="section">
+        <div class="section-head">
+          <h2 class="section-title">Workspace Access</h2>
+          <p class="section-help">Control what the selected CLI can do in your project workspace.</p>
+        </div>
+        <div class="permission-row">
+          <label class="pill-choice">
+            <input type="radio" name="sm-workspace" value="read-only">
+            <span class="pill-dot" aria-hidden="true"></span>
+            <span>Read only</span>
+          </label>
+          <label class="pill-choice">
+            <input type="radio" name="sm-workspace" value="workspace">
+            <span class="pill-dot" aria-hidden="true"></span>
+            <span>Allow workspace edits</span>
+          </label>
+        </div>
+        <div class="permission-row">
+          <label class="pill-choice" for="sm-shell">
+            <input type="checkbox" id="sm-shell">
+            <span>Also allow shell commands (unconfined)</span>
+          </label>
+        </div>
+        <p class="section-help">Shell commands run as you and are not confined to the workspace folder.
+          Applies to Claude Code; Codex is sandboxed by its own runtime.</p>
+        <div class="workspace-row">
+          <button class="secondary-btn" type="button" id="sm-choose-workspace">
+            <img class="btn-icon" alt="" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CiAgICAgIDxwYXRoIGQ9Ik04IDE4aDE4bDUgNmgyNXYyN0g4eiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMTExODI3IiBzdHJva2Utd2lkdGg9IjMuNSIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgogICAgPC9zdmc+">Choose Workspace…
+          </button>
+          <span class="workspace-label" id="sm-workspace-label">Current App Folder</span>
+        </div>
+      </section>
+      </div>
+      <div class="sm-tab-panel" data-panel="music" hidden>
+      <section class="section">
+        <div class="section-head">
+          <h2 class="section-title">Music Service</h2>
+          <p class="section-help">Where the playlists play from. iTunes provides official 30-second previews with no account; YouTube can play full tracks when embedding is available; Spotify plays through your Spotify app (Premium).</p>
+        </div>
+        <div class="permission-row music-service-grid">
+          <label class="pill-choice">
+            <input type="radio" name="sm-music" value="itunes" checked>
+            <span class="pill-dot" aria-hidden="true"></span>
+            <svg class="pill-icon" viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="itunes-sm" x1="10" y1="54" x2="52" y2="9" gradientUnits="userSpaceOnUse"><stop stop-color="#fb3b61"/><stop offset="1" stop-color="#9b45e8"/></linearGradient></defs><circle cx="32" cy="32" r="27" fill="url(#itunes-sm)"/><path d="M27 19v25a7 7 0 1 1-4-6.3V24l22-4v19a7 7 0 1 1-4-6.3V15z" fill="#fff"/></svg>
+            <span>iTunes (30-sec previews)</span>
+          </label>
+          <label class="pill-choice">
+            <input type="radio" name="sm-music" value="youtube">
+            <span class="pill-dot" aria-hidden="true"></span>
+            <svg class="pill-icon" viewBox="0 0 64 64" aria-hidden="true"><rect x="6" y="14" width="52" height="36" rx="9" fill="#ef4444"/><path d="m27 23 14 9-14 9z" fill="#fff"/></svg>
+            <span>YouTube (free)</span>
+          </label>
+          <label class="pill-choice">
+            <input type="radio" name="sm-music" value="spotify">
+            <span class="pill-dot" aria-hidden="true"></span>
+            <svg class="pill-icon" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="26" fill="#1DB954"/><path d="M19 26c9-3 19-2 27 3M21 34c7-2 15-1 21 3M23 41c5-1.5 11-.8 15 2" fill="none" stroke="#0b0b0b" stroke-width="4" stroke-linecap="round"/></svg>
+            <span>Spotify (subscription)</span>
+          </label>
+        </div>
+        <div class="connect-row" id="sm-spotify-row" hidden>
+          <input class="api-input" id="sm-spotify-client" type="text" spellcheck="false"
+            autocomplete="off" placeholder="Spotify app Client ID">
+          <button class="secondary-btn" type="button" id="sm-spotify-connect">Connect Spotify…</button>
+          <button class="secondary-btn" type="button" id="sm-spotify-disconnect" hidden>Disconnect</button>
+          <span class="svc-status" id="sm-spotify-status">Not connected</span>
+        </div>
+        <p class="section-help" id="sm-spotify-help" hidden>Create a free app at
+          developer.spotify.com/dashboard, give it the Redirect URI shown after you click
+          Connect, and paste its Client ID above. Playback needs Spotify Premium with the
+          Spotify app open on any device.</p>
+      </section>
+      </div>
+    </div>
+
+    <footer class="footer">
+      <button class="ghost" type="button" id="sm-cancel">Cancel</button>
+      <button class="primary" type="button" id="sm-save">Save</button>
+    </footer>
+  </main>
+</div>
+
+<script src="js/version.js"></script>
+<script src="js/glyphs.js"></script>
+<script src="js/font.js"></script>
+<script src="js/windows.js"></script>
+<script src="js/media-library.js"></script>
+<script src="js/player.js"></script>
+<script src="js/music-service.js"></script>
+<script src="js/radio.js"></script>
+<script src="js/api.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

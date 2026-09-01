@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.vercel/
+.env*
+00_project_files/
+handoff-work/
+smoke-*.json
+smoke-*.png
+smoke-*.jpg
+npm-debug.log*
+assets/claw-icon.png

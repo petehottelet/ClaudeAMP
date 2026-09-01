@@ -1,0 +1,53 @@
+name: Verify
+
+# Strict proof that the app works normally on real macOS and Windows
+# machines: launches the actual Electron app and asserts window creation,
+# click capture, per-platform click-through decisions, the PTY shell, and
+# the local bridge. Runs standalone on pushes and as a gate inside the
+# Release workflow (workflow_call).
+#
+# History: the macOS leg was once downgraded to verify:source because the
+# hosted ARM image failed node-pty spawns with `posix_spawnp failed`. Root
+# cause was npm shipping the darwin prebuilds' spawn-helper without its
+# executable bit; scripts/patch-node-pty.cjs restores it at install time,
+# and the full macOS proof has run green since (v1.6.0 release runs).
+on:
+  push:
+    # main only: the feature branch pushes the same commits, and every
+    # duplicate matrix run burns macOS minutes (billed at 10x).
+    branches: ["main"]
+  pull_request: {}
+  workflow_dispatch: {}
+  workflow_call: {}
+
+jobs:
+  # Cheap pre-merge gate for pull requests: syntax, lint, and the unit
+  # suite on ubuntu. The two-OS app-launch matrix stays on main pushes,
+  # dispatch, and release calls.
+  source:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run verify:source
+  app:
+    if: github.event_name != 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run source regression checks and launch the verified app
+        run: npm run verify

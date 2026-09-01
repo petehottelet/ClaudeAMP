@@ -1,0 +1,184 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+    branches: ["release/**"]
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Type yes to publish a real release for the version in package.json"
+        required: false
+        default: "no"
+
+permissions:
+  contents: write
+
+# Publishing happens in exactly three cases: a v* tag push; a manual
+# dispatch that explicitly says publish=yes; or a release/** branch push
+# for a version whose release does not exist yet (electron-builder then
+# creates the v<version> tag and release itself). Everything else - and
+# any release/** push for an already-released version - builds as a dry
+# run, so the bytes of a published version can never be overwritten by
+# accident.
+jobs:
+  # Installers build only after the platform verification matrix passes. The
+  # Windows runner performs the full Electron/PTY proof; macOS runs the source
+  # suite because its hosted ARM image cannot spawn node-pty shells.
+  verify:
+    uses: ./.github/workflows/verify.yml
+
+  # Decide whether this run publishes, and if so create the release ONCE
+  # before the build fan-out: three concurrent electron-builder legs racing
+  # to create it produced duplicate same-tag releases (v1.6.0 shipped with
+  # its mac assets stranded on a duplicate). Creating it here also pins the
+  # tag to the commit actually being built.
+  prepare:
+    needs: verify
+    runs-on: ubuntu-latest
+    outputs:
+      publish: ${{ steps.decide.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Decide publish mode and pre-create the release
+        id: decide
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ELIGIBLE: ${{ startsWith(github.ref, 'refs/tags/') || inputs.publish == 'yes' || startsWith(github.ref, 'refs/heads/release/') }}
+        run: |
+          mode=never
+          if [ "$ELIGIBLE" = "true" ]; then
+            tag="v$(node -p "require('./package.json').version")"
+            if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              echo "release $tag already exists - builds will be dry runs"
+            else
+              gh release create "$tag" --repo "$GITHUB_REPOSITORY" \
+                --target "$GITHUB_SHA" --title "${tag#v}" --notes "ClaudeAmp ${tag#v}"
+              mode=always
+            fi
+          fi
+          echo "publish=$mode" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: [verify, prepare]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            args: --win nsis
+            smokebuild: npx electron-builder --win --dir
+            smoke: npm run smoke:packaged
+          - os: macos-latest
+            args: --mac
+            smokebuild: npx electron-builder --mac --dir --arm64
+            smoke: node scripts/verify-packaged.cjs "$(ls -d dist/mac*/ClaudeAmp.app | head -1)/Contents/MacOS/ClaudeAmp"
+          - os: ubuntu-latest
+            args: --linux appimage
+            smokebuild: npx electron-builder --linux --dir
+            smoke: |
+              sudo apt-get -qq update && sudo apt-get -qq install -y xvfb
+              xvfb-run -a node scripts/verify-packaged.cjs dist/linux-unpacked/claudeamp --no-sandbox
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Version strings must agree everywhere
+        shell: bash
+        run: |
+          node -e "
+            const pkg = require('./package.json').version;
+            const src = require('fs').readFileSync('js/version.js', 'utf8');
+            const m = src.match(/CLAUDEAMP_VERSION = \"([^\"]+)\"/);
+            if (!m || m[1] !== pkg) {
+              console.error('version mismatch: package.json=' + pkg + ' js/version.js=' + (m && m[1]));
+              process.exit(1);
+            }
+            console.log('version ' + pkg + ' consistent');
+          "
+      # The packaged app - asar, unpacked node-pty, terminal, bridge - must
+      # prove itself on this platform before anything publishes.
+      - name: Build the unpacked app for packaged verification
+        shell: bash
+        run: ${{ matrix.smokebuild }}
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - name: Run the packaged app's self-verification
+        shell: bash
+        run: ${{ matrix.smoke }}
+      - name: Build and publish installers
+        shell: bash
+        run: npx electron-builder ${{ matrix.args }} --publish "${{ needs.prepare.outputs.publish || 'never' }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # mac builds ship unsigned; skip identity discovery so CI never stalls
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+  # Attach a SHA256SUMS.txt covering every released asset, so install.sh (and
+  # anyone downloading by hand) can verify what they got.
+  checksums:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/') || inputs.publish == 'yes' || startsWith(github.ref, 'refs/heads/release/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compute and attach SHA256SUMS.txt
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="v$(node -p "require('./package.json').version")"
+          # Heal any duplicate same-tag releases left by pre-'prepare' runs:
+          # keep the oldest, move every asset onto it, delete the rest.
+          ids=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+            --jq "[.[] | select(.tag_name == \"$tag\")] | sort_by(.id) | .[].id")
+          main_id=$(echo "$ids" | head -1)
+          for id in $(echo "$ids" | tail -n +2); do
+            gh api "repos/$GITHUB_REPOSITORY/releases/$id/assets?per_page=100" \
+              --jq '.[] | "\(.id) \(.name)"' |
+            while read -r aid name; do
+              curl -sSfL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/octet-stream" \
+                -o "/tmp/$name" "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/assets/$aid"
+              curl -sSf -X POST -H "Authorization: Bearer $GH_TOKEN" \
+                -H "Content-Type: application/octet-stream" --data-binary @"/tmp/$name" \
+                "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$main_id/assets?name=$name" \
+                > /dev/null || echo "kept existing $name on the canonical release"
+              rm -f "/tmp/$name"
+            done
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/$id"
+            echo "merged duplicate release $id into $main_id"
+          done
+          # not "assets": the checkout already has a directory by that name
+          mkdir -p /tmp/release-assets && cd /tmp/release-assets
+          gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern '*'
+          rm -f SHA256SUMS.txt
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          gh release upload "$tag" SHA256SUMS.txt --clobber --repo "$GITHUB_REPOSITORY"
+
+  # The release is complete only when every installer artifact is present and
+  # the checksum file round-trips. A failure here is the guard working.
+  verify-assets:
+    needs: checksums
+    if: startsWith(github.ref, 'refs/tags/') || inputs.publish == 'yes' || startsWith(github.ref, 'refs/heads/release/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require installers and verify checksums
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="v$(node -p "require('./package.json').version")"
+          version="${tag#v}"
+          mkdir -p /tmp/release-assets && cd /tmp/release-assets
+          gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern '*'
+          for f in "ClaudeAmp-$version-arm64.zip" "ClaudeAmp-$version-x64.zip" \
+                   "ClaudeAmp-$version-arm64.dmg" "ClaudeAmp-$version-x64.dmg" \
+                   "ClaudeAmp-Setup-$version.exe" SHA256SUMS.txt; do
+            [ -f "$f" ] || { echo "missing release asset: $f" >&2; exit 1; }
+          done
+          ls ClaudeAmp-"$version"-*.AppImage >/dev/null 2>&1 || { echo "missing release asset: AppImage" >&2; exit 1; }
+          grep -v ' SHA256SUMS.txt$' SHA256SUMS.txt | sha256sum -c -

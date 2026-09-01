@@ -1,0 +1,152 @@
+{
+  "name": "claudeamp",
+  "productName": "ClaudeAmp",
+  "version": "1.7.0",
+  "description": "A classically-styled terminal interface for Claude Code, OpenAI Codex, and Ollama. For Windows, macOS, and Linux.",
+  "main": "electron/main.cjs",
+  "author": "Pete Hottelet",
+  "homepage": "https://www.claudeamp.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/petehottelet/claudeamp.git"
+  },
+  "license": "MIT",
+  "keywords": [
+    "ai-chat",
+    "claude-code",
+    "codex-cli",
+    "electron",
+    "ollama",
+    "terminal",
+    "desktop-app",
+    "music-player"
+  ],
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "postinstall": "node scripts/patch-node-pty.cjs",
+    "bridge": "node bridge.js",
+    "check": "node scripts/check-syntax.cjs",
+    "lint": "eslint .",
+    "test": "node --test test/*.test.cjs",
+    "verify:source": "npm run check && npm run lint && npm test",
+    "verify:app": "node scripts/verify-app.js",
+    "verify": "npm run verify:source && npm run verify:app",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win nsis",
+    "dist:mac": "electron-builder --mac",
+    "dist:linux": "electron-builder --linux appimage",
+    "smoke:packaged": "node scripts/smoke-packaged.cjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "electron": "43.4.1",
+    "electron-builder": "26.15.3",
+    "eslint": "^10.9.1",
+    "globals": "^17.11.0"
+  },
+  "build": {
+    "appId": "com.claudeamp.desktop",
+    "productName": "ClaudeAmp",
+    "asar": true,
+    "npmRebuild": false,
+    "compression": "maximum",
+    "electronLanguages": [
+      "en-US"
+    ],
+    "files": [
+      "assets/**/*",
+      "css/**/*",
+      "js/**/*",
+      "bridge.js",
+      "bridge-music.cjs",
+      "electron/**/*",
+      "index.html",
+      "LICENSE",
+      "package.json",
+      "node_modules/@xterm/**/*",
+      "node_modules/node-pty/**/*",
+      "!node_modules/node-pty/prebuilds/**/*.pdb"
+    ],
+    "asarUnpack": [
+      "node_modules/node-pty/**/*",
+      "electron/pty-host.cjs"
+    ],
+    "extraResources": [
+      {
+        "from": "assets/claw-icon.ico",
+        "to": "claw-icon.ico"
+      }
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "petehottelet",
+        "repo": "ClaudeAMP",
+        "releaseType": "release"
+      }
+    ],
+    "win": {
+      "icon": "assets/claw-icon.ico",
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "ClaudeAmp-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "installerIcon": "assets/claw-mark.ico",
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "ClaudeAmp",
+      "include": "build/installer.nsh"
+    },
+    "afterSign": "scripts/afterSign.js",
+    "mac": {
+      "icon": "assets/claw-icon.icns",
+      "category": "public.app-category.music",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "ClaudeAmp-${version}-${arch}.${ext}",
+      "darkModeSupport": false
+    },
+    "dmg": {
+      "artifactName": "ClaudeAmp-${version}-${arch}.${ext}"
+    },
+    "linux": {
+      "icon": "assets/claw-icon.png",
+      "target": [
+        "AppImage"
+      ],
+      "category": "AudioVideo",
+      "syncDesktopName": true,
+      "artifactName": "ClaudeAmp-${version}-${arch}.${ext}"
+    }
+  },
+  "dependencies": {
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/xterm": "^5.5.0"
+  },
+  "optionalDependencies": {
+    "node-pty": "^1.1.0"
+  }
+}
