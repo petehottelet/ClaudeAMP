@@ -180,25 +180,26 @@ canvas { image-rendering: pixelated; display: block; }
 /* Downward caret in the LOWER-LEFT corner, pointing down at the hamburger
    just below it: a dark outline triangle with the tooltip-yellow fill nested
    inside, overlapping the tip's bottom border so it reads as one bubble. */
-/* Compact pixel-art down-caret. Keep the 12x8 SVG at its native size: scaling
-   it to 24x16 made the pointer read as a broken chunk missing from the bubble.
-   The narrower box is offset so its apex stays centered over the hamburger. */
+/* Compact pixel-art down-caret, 16x10 at native size. Every outline run is
+   exactly 2px thick and adjacent diagonal steps overlap by a pixel - the old
+   1px staircase left lone corner-touching squares that read as stray black
+   pixels once the desktop zoom scaled them up. */
 .onboarding-arrow {
   position: absolute;
-  left: 6.5px;
+  left: 4.5px;
   top: 100%;
   margin-top: -2px;
-  width: 12px; height: 8px;
-  background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20shape-rendering%3D%27crispEdges%27%20viewBox%3D%270%200%2012%208%27%3E%3Cg%20fill%3D%27%23080810%27%3E%3Crect%20x%3D%270%27%20y%3D%270%27%20width%3D%271%27%20height%3D%272%27%2F%3E%3Crect%20x%3D%2711%27%20y%3D%270%27%20width%3D%271%27%20height%3D%272%27%2F%3E%3Crect%20x%3D%271%27%20y%3D%272%27%20width%3D%271%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%2710%27%20y%3D%272%27%20width%3D%271%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%272%27%20y%3D%273%27%20width%3D%271%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%279%27%20y%3D%273%27%20width%3D%271%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%273%27%20y%3D%274%27%20width%3D%271%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%278%27%20y%3D%274%27%20width%3D%271%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%274%27%20y%3D%275%27%20width%3D%271%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%277%27%20y%3D%275%27%20width%3D%271%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%275%27%20y%3D%276%27%20width%3D%272%27%20height%3D%271%27%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%27%23F6C52F%27%3E%3Crect%20x%3D%271%27%20y%3D%270%27%20width%3D%2710%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%271%27%20y%3D%271%27%20width%3D%2710%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%272%27%20y%3D%272%27%20width%3D%278%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%273%27%20y%3D%273%27%20width%3D%276%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%274%27%20y%3D%274%27%20width%3D%274%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%275%27%20y%3D%275%27%20width%3D%272%27%20height%3D%271%27%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E");
+  width: 16px; height: 10px;
+  background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20shape-rendering%3D%27crispEdges%27%20viewBox%3D%270%200%2016%2010%27%3E%3Cg%20fill%3D%27%23080810%27%3E%3Crect%20x%3D%270%27%20y%3D%270%27%20width%3D%272%27%20height%3D%273%27%2F%3E%3Crect%20x%3D%2714%27%20y%3D%270%27%20width%3D%272%27%20height%3D%273%27%2F%3E%3Crect%20x%3D%271%27%20y%3D%273%27%20width%3D%272%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%2713%27%20y%3D%273%27%20width%3D%272%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%272%27%20y%3D%274%27%20width%3D%272%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%2712%27%20y%3D%274%27%20width%3D%272%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%273%27%20y%3D%275%27%20width%3D%272%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%2711%27%20y%3D%275%27%20width%3D%272%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%274%27%20y%3D%276%27%20width%3D%272%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%2710%27%20y%3D%276%27%20width%3D%272%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%275%27%20y%3D%277%27%20width%3D%272%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%279%27%20y%3D%277%27%20width%3D%272%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%276%27%20y%3D%278%27%20width%3D%274%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%277%27%20y%3D%279%27%20width%3D%272%27%20height%3D%271%27%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%27%23F6C52F%27%3E%3Crect%20x%3D%272%27%20y%3D%270%27%20width%3D%2712%27%20height%3D%273%27%2F%3E%3Crect%20x%3D%273%27%20y%3D%273%27%20width%3D%2710%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%274%27%20y%3D%274%27%20width%3D%278%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%275%27%20y%3D%275%27%20width%3D%276%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%276%27%20y%3D%276%27%20width%3D%274%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%277%27%20y%3D%277%27%20width%3D%272%27%20height%3D%271%27%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E");
   background-repeat: no-repeat;
   background-position: top center;
-  background-size: 12px 8px;
+  background-size: 16px 10px;
   image-rendering: pixelated;
 }
 /* macOS reverses the titlebar (traffic lights left, hamburger top-RIGHT), so
    the tip sits at the right and its caret points down at the right-side menu. */
 html.mac .onboarding-tip { left: auto; right: -6px; }
-html.mac .onboarding-arrow { left: auto; right: 6.5px; }
+html.mac .onboarding-arrow { left: auto; right: 4.5px; }
 .onboarding-close {
   position: absolute;
   right: 3px;

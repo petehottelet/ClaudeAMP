@@ -4,6 +4,34 @@ Notable changes to ClaudeAmp. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 the `package.json` version, which CI requires to agree with `js/version.js`.
 
+## [Unreleased]
+
+### Fixed
+- Terminal: the top of the window no longer stays black with text
+  crammed into the bottom. The WebGL renderer painted the grid into the
+  bottom-left 1/zoom of its canvas under the desktop's CSS zoom (the
+  first-run default is 1.5x); the terminal now uses the canvas renderer,
+  which sizes for the zoom and fills the panel.
+- The first-run tooltip's caret is 30% larger with a uniform 2px
+  outline; the old 1px staircase read as stray black squares once the
+  desktop zoom scaled it up.
+- macOS: clicks no longer fall through to the app behind after the
+  desktop sat idle for a while. App Nap was coalescing the cursor poll
+  that arms the panels (and Chromium was throttling the overlay's
+  hit-test), so the first click after a pause landed before the window
+  woke; the app now opts out of suspension and throttling, and any
+  activation re-arms immediately.
+
+### Changed
+- Windows: the running Setup window - titlebar icon, taskbar entry, and
+  header - shows the transparent claw art. Setup.exe's file icon in
+  Explorer stays the filled plaque matching the installed app.
+- The rain screensaver is the 1.5.1 original again, restored verbatim
+  from the old repository's history - glyph size, pacing, trail fade,
+  and glow exactly as they were.
+- README badges are live shields.io images in the glossy style - the
+  version badge tracks the latest GitHub release by itself.
+
 ## [1.7.2] - 2026-09-01
 
 ### Fixed

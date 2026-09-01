@@ -38,8 +38,9 @@ least `npm run verify:source` when they touch executable examples or workflows.
 
 ## Releases
 
-Keep `package.json`, `package-lock.json`, `js/version.js`, the version badge,
-the version regression test, and `CHANGELOG.md` synchronized. Future releases
+Keep `package.json`, `package-lock.json`, `js/version.js`, the version
+regression test, and `CHANGELOG.md` synchronized (the README badges are
+live shields.io images and update themselves). Future releases
 derive their GitHub notes from the matching changelog section through
 `scripts/release-notes.cjs`. Follow `docs/RELEASING.md`; never overwrite an
 existing release's artifacts.

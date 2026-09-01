@@ -49,8 +49,9 @@ those are not commits and do not affect the contributors graph.)
   else must pass.
 - Releases publish from `release/v<version>` branch pushes (or `v*`
   tags) once per version; see `.github/workflows/release.yml`. Bump
-  `package.json`, `js/version.js`, the lockfile, the version badge, the
-  release-regressions test, and `CHANGELOG.md` together. Delete the
+  `package.json`, `js/version.js`, the lockfile, the
+  release-regressions test, and `CHANGELOG.md` together (the README
+  badges are live shields.io images — nothing to bump). Delete the
   `release/**` branch once its release has published — it is a one-shot
   trigger, not a living branch.
 - OS icon assets (`assets/claw-icon.{ico,icns,png}`): the owner-approved
@@ -63,7 +64,10 @@ those are not commits and do not affect the contributors graph.)
   .ico sizes regenerated together. Inside the app UI only the
   transparent art (`assets/claw-mark.png`, the stacked logo) is ever
   used — never the solid-background icon. BOTH Windows executables
-  (Setup.exe and the installed app) embed the same filled rounded icon:
-  `nsis.installerIcon` stays unset so the installer inherits `win.icon`.
-  Do not reintroduce a transparent installer icon — the owner reversed
-  that experiment after seeing it in the taskbar.
+  (Setup.exe and the installed app) embed the same filled rounded icon
+  as their FILE icon: `nsis.installerIcon` stays unset so the installer
+  inherits `win.icon`. The RUNNING Setup window is the exception the
+  owner asked for: its titlebar, taskbar entry, and header show the
+  transparent art (`assets/claw-mark.ico`, swapped in at GUI init with
+  WM_SETICON in `build/installer.nsh`) — the swap must never touch the
+  compiled file icon.

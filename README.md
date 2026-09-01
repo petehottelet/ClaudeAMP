@@ -6,10 +6,10 @@
   </p>
 
   <p>
-    <a href="https://github.com/petehottelet/claudeamp/releases/latest"><img src="assets/badges/version.svg" alt="ClaudeAmp version 1.7.2"></a>
-    <a href="https://github.com/petehottelet/claudeamp/actions/workflows/verify.yml"><img src="https://github.com/petehottelet/claudeamp/actions/workflows/verify.yml/badge.svg?branch=main" alt="ClaudeAmp verification status"></a>
-    <img src="assets/badges/platforms.svg" alt="Desktop: Windows, macOS, and Linux">
-    <a href="LICENSE"><img src="assets/badges/license.svg" alt="License: MIT"></a>
+    <a href="https://github.com/petehottelet/claudeamp/releases/latest"><img src="https://img.shields.io/github/v/release/petehottelet/claudeamp?style=plastic&label=version&display_name=release&color=white" alt="Latest ClaudeAmp version"></a>
+    <a href="https://github.com/petehottelet/claudeamp/actions/workflows/verify.yml"><img src="https://img.shields.io/github/actions/workflow/status/petehottelet/claudeamp/verify.yml?branch=main&style=plastic&label=Verify&logo=github" alt="ClaudeAmp verification status"></a>
+    <img src="https://img.shields.io/badge/desktop-Windows%20%7C%20macOS%20%7C%20Linux-white?style=plastic" alt="Desktop: Windows, macOS, and Linux">
+    <a href="LICENSE"><img src="https://img.shields.io/github/license/petehottelet/claudeamp?style=plastic&color=black" alt="License: MIT"></a>
   </p>
 
   <p>
