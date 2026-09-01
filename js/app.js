@@ -3426,25 +3426,38 @@
         acc: Math.random(),
       });
     }
-    rainState = { trail, head, pad, stepY, columns, count, W, H };
+    // The persistence surface holds ONLY trail stamps and their fade; the
+    // glowing heads are composited onto the visible canvas fresh each
+    // frame and never touch this surface. Kept across rebuilds when the
+    // stage size is unchanged so running trails survive.
+    let surface = previous?.surface;
+    if (!surface || surface.width !== W || surface.height !== H) {
+      surface = document.createElement("canvas");
+      surface.width = W; surface.height = H;
+    }
+    rainState = { trail, head, pad, stepY, columns, count, W, H,
+      surface, surfaceCtx: surface.getContext("2d") };
   }
   function rainFx(energy) {
     if (typeof GLYPHS === "undefined") return; // glyph data missing: draw nothing
     if (!rainState) buildRain();
-    const { trail, head, pad, stepY, columns, count, W, H } = rainState;
-    // persistence: last frame's heads dim slowly into long trails (full canvas)
-    fxCtx.fillStyle = "rgba(0,0,0,0.034)";
-    fxCtx.fillRect(0, 0, W, H);
+    const { trail, head, pad, stepY, columns, count, W, H, surface, surfaceCtx } = rainState;
+    // Persistence: trail stamps dim slowly on the offscreen surface. Heads
+    // are drawn onto the VISIBLE canvas every frame (constant glow, thick,
+    // smooth) but never onto the surface - so their glow cannot accumulate
+    // into a saturated blob that a later, darker trail stamp would read as
+    // a black character knocked out of green.
+    surfaceCtx.fillStyle = "rgba(0,0,0,0.034)";
+    surfaceCtx.fillRect(0, 0, W, H);
+    surfaceCtx.globalAlpha = 1;
     const dt = 1 / 60;
     const pace = 1 + energy * 0.25; // original speed, swaying a touch with the music
     for (const col of columns) {
       col.acc += dt * col.rate * (col.burst > 0 ? 1.9 : 1) * pace;
       if (col.burst > 0) col.burst -= dt;
-      const advanced = col.acc >= 1;
       while (col.acc >= 1) {
         col.acc -= 1;
-        fxCtx.globalAlpha = 1;
-        fxCtx.drawImage(trail[(col.glyph + col.phase) % count], col.x - pad, col.y - pad);
+        surfaceCtx.drawImage(trail[(col.glyph + col.phase) % count], col.x - pad, col.y - pad);
         col.y += stepY;
         col.phase = (col.phase + 7) % count;
         const past = col.y - GLYPHS.trails[col.glyph] * stepY * 1.15;
@@ -3455,12 +3468,14 @@
           if (Math.random() < 0.06) col.burst = 1.6;
         }
       }
-      // Stamp the head only on an advance: at slow fall rates a head
-      // redrawn every frame at the same cell saturates its soft glow into
-      // a solid bright blob, and the next darker trail stamp then reads
-      // as a black glyph knocked out of green. Stamped once, the
-      // persistence fade dims it naturally until the next step.
-      if (advanced && col.y > -stepY && col.y < H + stepY) {
+    }
+    // composite: faded trails below, live glowing heads above
+    fxCtx.globalCompositeOperation = "copy";
+    fxCtx.globalAlpha = 1;
+    fxCtx.drawImage(surface, 0, 0);
+    fxCtx.globalCompositeOperation = "source-over";
+    for (const col of columns) {
+      if (col.y > -stepY && col.y < H + stepY) {
         fxCtx.globalAlpha = col.burst > 0 ? 1 : 0.92;
         fxCtx.drawImage(head[(col.glyph + col.phase) % count], col.x - pad, col.y - pad);
       }

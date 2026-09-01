@@ -4,6 +4,17 @@ Notable changes to ClaudeAmp. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 the `package.json` version, which CI requires to agree with `js/version.js`.
 
+## [1.7.1] - 2026-09-01
+
+### Fixed
+- The rain screensaver's glow, thickness, and smooth motion are back.
+  The 1.6.6 fix for black reversed-out characters stopped re-stamping
+  the glowing heads each frame, which also dimmed and roughened them.
+  Trails and their fade now live on an offscreen persistence surface
+  and the heads composite on top of it every frame - constant glow,
+  and the reversal cannot happen at all since head glow never reaches
+  the surface trail stamps land on.
+
 ## [1.7.0] - 2026-09-01
 
 First release from the re-founded repository. Includes everything
