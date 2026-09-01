@@ -475,6 +475,21 @@ const WM = (() => {
     return false;
   }
 
+  // The desktop's layout size is viewport/zoom, so raising the zoom shrinks
+  // it and can strand panels beyond the new right/bottom edge - where, on
+  // macOS, everything outside panel rects ignores the mouse. Called after
+  // every zoom change with the same clamp the drag logic enforces.
+  function clampIntoDesktop() {
+    wins.forEach(win => {
+      const left = parseInt(win.style.left, 10) || 0;
+      const top = parseInt(win.style.top, 10) || 0;
+      place(win,
+        Math.max(30 - designSize(win).w, Math.min(left, desktop.offsetWidth - 30)),
+        Math.max(0, Math.min(top, desktop.offsetHeight - 14)));
+    });
+    saveLayout();
+  }
+
   function init() {
     const saved = loadLayout();
     document.querySelectorAll(".wa-window").forEach(win => {
@@ -494,7 +509,7 @@ const WM = (() => {
          raised) can restore panels beyond the window; on macOS everything
          outside panel rects ignores the mouse, so the app would be visible
          but untouchable. Clamp like clampGroupDelta does during drags. */
-      const x = Math.max(30 - win.offsetWidth, Math.min(d.x, desktop.offsetWidth - 30));
+      const x = Math.max(30 - designSize(win).w, Math.min(d.x, desktop.offsetWidth - 30));
       const y = Math.max(0, Math.min(d.y, desktop.offsetHeight - 14));
       place(win, x, y);
       if (win.dataset.resize) {
@@ -528,5 +543,5 @@ const WM = (() => {
   }
 
   return { init, toggle, toggleShade, visible, bringToFront, zoomFactor, saveLayout,
-    dockedIds, moveDockGroup };
+    dockedIds, moveDockGroup, clampIntoDesktop };
 })();

@@ -4,6 +4,58 @@ Notable changes to ClaudeAmp. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 the `package.json` version, which CI requires to agree with `js/version.js`.
 
+## [1.7.2] - 2026-09-01
+
+### Fixed
+- Windows: the Setup executable embeds the same filled rounded brand
+  icon as the installed app, so the installer's file, window, and
+  taskbar presence all match. (The transparent installer icon from
+  1.6.4 is gone.)
+- Terminal: block art (the Claude Code mascot included) renders
+  cell-exact on every platform - GPU renderer with a canvas fallback
+  and xterm's own box/block glyphs, integer cell heights at every zoom
+  step, one font stack with Menlo covering macOS, truecolor for TUIs,
+  and Unicode 11 widths so columns stay aligned.
+- The rain's trail characters are solid glowing character-green, not
+  dark outlines.
+- The first-run tooltip's caret is clean stepped pixel art with a tight
+  outline - no stray black pixels under the tip.
+- A returning Terminal-mode user who dismisses the re-shown welcome
+  with its close button still gets their terminal opened.
+- Re-running the welcome no longer switches a signed-in Codex or Ollama
+  user back to Claude, and finishing it in chat mode now puts the chat
+  window back if the terminal was showing.
+- Windows: upgrades keep your taskbar pin and respect a deleted desktop
+  shortcut, and the pin's icon is repaired during the upgrade. (The
+  installer's choose-a-directory page is gone - it silently forced
+  shortcut recreation on every upgrade.)
+- Releases are published as prereleases until every installer and its
+  checksum are verified, so the "latest" release - the install script
+  and the in-app update check read it - can never be empty or partial.
+- The rain screensaver paces by real elapsed time (no more double-speed
+  fall on 120 Hz displays) and survives a missing glyph sheet.
+- Saved layouts restore correctly when panels were hidden or the zoom
+  differed, and changing zoom pulls stranded panels back on screen.
+- macOS: a panel hanging off the left edge of the screen no longer
+  leaves a phantom click-swallowing strip at the desktop's left edge.
+
+### Added
+- macOS: a native menu bar mirroring the in-app menu - ClaudeAmp, File,
+  Edit, View, Account (when signed in), Window, and Help, with keyboard
+  shortcuts (Cmd+1-7 toggle windows, Cmd+, opens Settings, Cmd+0/=/-
+  drive zoom) and checkmarks that track the app live. One spec
+  (js/menu-spec.js) drives both renderings so they cannot drift; there
+  is no Services item. The same shortcuts work on Windows and Linux
+  with the bar hidden.
+- macOS: a Dock menu (Play/Pause, Next, Previous, Show Terminal), a
+  correct native About panel, and the desktop overlay now follows you
+  across Spaces (never over full-screen apps).
+- macOS: CLAUDEAMP_HITTEST_TRACE=1 logs click-through decisions to
+  userData/hittest.log for diagnosing missed clicks.
+- The claudeamp.com landing page lives in `site/` (Vercel serves it via
+  `vercel.json`): the wide logo and interface screenshot above the
+  fold, the app's own palette, and download links.
+
 ## [1.7.1] - 2026-09-01
 
 ### Fixed

@@ -22,9 +22,8 @@ permissions:
 # run, so the bytes of a published version can never be overwritten by
 # accident.
 jobs:
-  # Installers build only after the platform verification matrix passes. The
-  # Windows runner performs the full Electron/PTY proof; macOS runs the source
-  # suite because its hosted ARM image cannot spawn node-pty shells.
+  # Installers build only after the platform verification matrix passes:
+  # both macOS and Windows runners perform the full Electron/PTY proof.
   verify:
     uses: ./.github/workflows/verify.yml
 
@@ -53,9 +52,12 @@ jobs:
             if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
               echo "release $tag already exists - builds will be dry runs"
             else
+              # Prerelease until verify-assets confirms every installer is
+              # attached: /releases/latest (install.sh, the website button)
+              # must never point at a release whose assets are still building.
               node scripts/release-notes.cjs "$version" > /tmp/claudeamp-release-notes.md
               gh release create "$tag" --repo "$GITHUB_REPOSITORY" \
-                --target "$GITHUB_SHA" --title "$version" \
+                --target "$GITHUB_SHA" --title "$version" --prerelease \
                 --notes-file /tmp/claudeamp-release-notes.md
               mode=always
             fi
@@ -185,3 +187,6 @@ jobs:
           done
           ls ClaudeAmp-"$version"-*.AppImage >/dev/null 2>&1 || { echo "missing release asset: AppImage" >&2; exit 1; }
           grep -v ' SHA256SUMS.txt$' SHA256SUMS.txt | sha256sum -c -
+          # Everything is present and verified: promote the prerelease so
+          # /releases/latest starts serving this version.
+          gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --prerelease=false --latest

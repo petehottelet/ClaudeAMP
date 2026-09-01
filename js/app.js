@@ -1678,13 +1678,93 @@
   });
 
 
+  /* One command map for both menu renderings: the in-app hamburger below
+     and the native menu bar (electron/main.cjs builds it from
+     js/menu-spec.js and sends ids back over claudeamp:menu-command).
+     test/menu-spec.test.cjs pins that every spec id has a handler here. */
+  const ZOOM_STEPS = [1, 1.5, 2, 2.5, 3];
+  function stepZoom(direction) {
+    const at = ZOOM_STEPS.indexOf(S.zoom);
+    const next = ZOOM_STEPS[Math.max(0, Math.min(ZOOM_STEPS.length - 1,
+      (at < 0 ? 1 : at) + direction))];
+    setZoom(next);
+  }
+  function toggleWindowCmd(id) {
+    WM.toggle(id); syncWinButtons();
+  }
+  const MENU_COMMANDS = {
+    "about": () => showDialog("dlg-about"),
+    "welcome": openSetup,
+    "settings": openSettings,
+    "open-audio": () => $("file-audio").click(),
+    "saved-playlists": openSavedPlaylists,
+    "jump-to-track": openJump,
+    "toggle-win-main": () => toggleWindowCmd("win-main"),
+    "toggle-win-chat": () => toggleWindowCmd("win-chat"),
+    "toggle-win-eq": () => toggleWindowCmd("win-eq"),
+    "toggle-win-pl": () => toggleWindowCmd("win-pl"),
+    "toggle-win-usage": () => toggleWindowCmd("win-usage"),
+    "toggle-win-mb": () => toggleWindowCmd("win-mb"),
+    "toggle-win-term": () => setChatMode(WM.visible("win-term") ? "chat" : "shell"),
+    "mode-chat": () => setChatMode("chat"),
+    "mode-shell": () => setChatMode("shell"),
+    "zoom-1": () => setZoom(1),
+    "zoom-1.5": () => setZoom(1.5),
+    "zoom-2": () => setZoom(2),
+    "zoom-2.5": () => setZoom(2.5),
+    "zoom-3": () => setZoom(3),
+    "zoom-in": () => stepZoom(1),
+    "zoom-out": () => stepZoom(-1),
+    "logout": () => { const cli = provider().cli; if (cli) logoutCli(cli); },
+    "quit": quitApp,
+    "play-pause": () => { if (Music.mode === "playing") Music.pause(); else Music.play(); },
+    "next-track": () => Music.next(false),
+    "prev-track": () => Music.prev(),
+    "show-terminal": () => setChatMode("shell"),
+    "help-docs": () => window.open("https://github.com/petehottelet/claudeamp#readme"),
+    "help-changelog": () => window.open("https://github.com/petehottelet/claudeamp/blob/main/CHANGELOG.md"),
+    "help-issue": () => window.open("https://github.com/petehottelet/claudeamp/issues"),
+  };
+  function runMenuCommand(id) {
+    const fn = MENU_COMMANDS[id];
+    if (fn) { fn(); syncMenuState(); }
+  }
+  // State flows renderer -> main so the native checkmarks stay honest.
+  // Pushed after every command and on a slow heartbeat (window buttons and
+  // drags change visibility outside the command map); main rebuilds only
+  // when the payload actually changed.
+  let lastMenuState = "";
+  function syncMenuState() {
+    const desktop = window.claudeAmpDesktop;
+    if (!desktop || !desktop.setMenuState) return;
+    const cliName = provider().cli;
+    const cliState = cliName ? bridgeStatus[cliName] : null;
+    const state = {
+      windows: {
+        "win-main": WM.visible("win-main"), "win-chat": WM.visible("win-chat"),
+        "win-eq": WM.visible("win-eq"), "win-pl": WM.visible("win-pl"),
+        "win-usage": WM.visible("win-usage"), "win-mb": WM.visible("win-mb"),
+        "win-term": WM.visible("win-term"),
+      },
+      mode: S.chatMode === "shell" ? "shell" : "chat",
+      zoom: S.zoom,
+      termAvailable: !!window.claudeampTerm,
+      signedIn: !!(cliState && cliState.ready),
+      account: (cliState && cliState.account) || "",
+    };
+    const key = JSON.stringify(state);
+    if (key === lastMenuState) return;
+    lastMenuState = key;
+    try { desktop.setMenuState(state); } catch (_) {}
+  }
+
   function mainMenu(x, y, guide = null) {
     const guideLogin = !guide && !store.raw(LOGIN_MENU_ONBOARDING_KEY);
     const guideTarget = guide?.target || (guideLogin ? "settings" : "");
     const guided = id => id === guideTarget ? { className: "login-onboarding", sparkles: true } : {};
     const winItem = (label, id) => ({
       label, checked: WM.visible(id),
-      fn: () => { WM.toggle(id); syncWinButtons(); },
+      fn: () => runMenuCommand("toggle-" + id),
     });
     // Signed-in CLI account line + logout action, shown only when a
     // subscription model is connected. This group lives in the menu footer.
@@ -1693,17 +1773,17 @@
     const signedIn = cliState && cliState.ready;
     const accountItems = signedIn ? [
       { label: cliState.account || "Signed in", disabled: true },
-      { label: "Log Out", fn: () => logoutCli(cliName) },
+      { label: "Log Out", fn: () => runMenuCommand("logout") },
     ] : [];
 
     openMenu([
-      { label: "Welcome", fn: openSetup },
-      { label: "Settings", id: "settings", fn: openSettings, ...guided("settings") },
-      { label: "About ClaudeAmp...", fn: () => showDialog("dlg-about") },
+      { label: "Welcome", fn: () => runMenuCommand("welcome") },
+      { label: "Settings", id: "settings", fn: () => runMenuCommand("settings"), ...guided("settings") },
+      { label: "About ClaudeAmp...", fn: () => runMenuCommand("about") },
       "-",
-      { label: "Open Audio Files...", fn: () => $("file-audio").click() },
-      { label: "Saved Playlists...", fn: openSavedPlaylists },
-      { label: "Jump to Track...", fn: openJump },
+      { label: "Open Audio Files...", fn: () => runMenuCommand("open-audio") },
+      { label: "Saved Playlists...", fn: () => runMenuCommand("saved-playlists") },
+      { label: "Jump to Track...", fn: () => runMenuCommand("jump-to-track") },
       "-",
       winItem("Main Window", "win-main"),
       winItem("Chat", "win-chat"),
@@ -1712,20 +1792,20 @@
       winItem("Usage Monitor", "win-usage"),
       winItem("Visualization", "win-mb"),
       { label: "Terminal", checked: WM.visible("win-term"),
-        fn: () => setChatMode(WM.visible("win-term") ? "chat" : "shell") },
+        fn: () => runMenuCommand("toggle-win-term") },
       "-",
-      { label: "Mode: AI Chat", checked: S.chatMode !== "shell", fn: () => setChatMode("chat") },
+      { label: "Mode: AI Chat", checked: S.chatMode !== "shell", fn: () => runMenuCommand("mode-chat") },
       { label: "Mode: Real Terminal", checked: S.chatMode === "shell",
-        disabled: !window.claudeampTerm, fn: () => setChatMode("shell") },
+        disabled: !window.claudeampTerm, fn: () => runMenuCommand("mode-shell") },
       "-",
-      { label: "Zoom 1x", checked: S.zoom === 1, fn: () => setZoom(1) },
-      { label: "Zoom 1.5x", checked: S.zoom === 1.5, fn: () => setZoom(1.5) },
-      { label: "Zoom 2x", checked: S.zoom === 2, fn: () => setZoom(2) },
-      { label: "Zoom 2.5x", checked: S.zoom === 2.5, fn: () => setZoom(2.5) },
-      { label: "Zoom 3x", checked: S.zoom === 3, fn: () => setZoom(3) },
+      { label: "Zoom 1x", checked: S.zoom === 1, fn: () => runMenuCommand("zoom-1") },
+      { label: "Zoom 1.5x", checked: S.zoom === 1.5, fn: () => runMenuCommand("zoom-1.5") },
+      { label: "Zoom 2x", checked: S.zoom === 2, fn: () => runMenuCommand("zoom-2") },
+      { label: "Zoom 2.5x", checked: S.zoom === 2.5, fn: () => runMenuCommand("zoom-2.5") },
+      { label: "Zoom 3x", checked: S.zoom === 3, fn: () => runMenuCommand("zoom-3") },
       ...(accountItems.length ? ["-", ...accountItems] : []),
       "-",
-      { label: "Quit ClaudeAmp", fn: quitApp },
+      { label: "Quit ClaudeAmp", fn: () => runMenuCommand("quit") },
     ], x, y);
     if (guide?.message) {
       const row = ctxmenu.querySelector(`[data-menu-id="${guideTarget}"]`);
@@ -1777,25 +1857,30 @@
       document.head.appendChild(link);
       await loadScript("node_modules/@xterm/xterm/lib/xterm.js");
       await loadScript("node_modules/@xterm/addon-fit/lib/addon-fit.js");
+      await loadScript("node_modules/@xterm/addon-webgl/lib/addon-webgl.js");
+      await loadScript("node_modules/@xterm/addon-canvas/lib/addon-canvas.js");
+      await loadScript("node_modules/@xterm/addon-unicode11/lib/addon-unicode11.js");
     } catch (_) {
       termFailed = true;
       termNote("TERMINAL ASSETS MISSING - RUN NPM INSTALL AND RESTART");
       return false;
     }
     try {
-    // macOS ships neither Lucida Console nor Cascadia Mono, so the stack
-    // used to land on Courier New - whose Unicode block-element coverage is
-    // poor enough to garble the Claude CLI's block-art banner. Menlo (the
-    // classic Terminal.app face) renders block and box-drawing glyphs
-    // correctly and keeps the same feel.
-    const terminalFont = window.claudeampNative?.platform === "darwin"
-      ? '"Menlo", "Monaco", monospace'
-      : '"Lucida Console", "Courier New", "Cascadia Mono", monospace';
+    // One stack for every platform: Lucida Console first (the blocky
+    // classic-Windows face; absent on macOS), then Menlo - which every Mac
+    // ships with full Block Elements coverage, so the Claude CLI's block-art
+    // banner renders whole instead of falling through to Courier New.
+    const terminalFont = '"Lucida Console", "Menlo", "Cascadia Mono", "Courier New", monospace';
     term = new window.Terminal({
-      // Lucida Console is the blockier classic-Windows face; Courier New and
-      // Cascadia Mono keep the terminal readable if it is unavailable.
       fontFamily: terminalFont,
-      fontSize: 13,
+      // 12px keeps the cell height an integer at every zoom step
+      // (12/18/24/30/36); 13px at 1.5x zoom was 19.5 device pixels, and the
+      // fractional rows drew hairline seams through block art.
+      fontSize: 12,
+      // xterm draws U+2500-U+259F (box drawing + block elements) itself,
+      // cell-exact, instead of trusting the font - the other half of the
+      // garbled-mascot fix. Takes effect with the webgl/canvas renderer.
+      customGlyphs: true,
       cursorBlink: true,
       theme: {
         background: "#000000", foreground: "#00FF00",
@@ -1810,6 +1895,37 @@
     // opening; opening xterm into a 0x0 box yields a black, zero-row panel.
     await waitForSize($("term-holder"));
     term.open($("term-holder"));
+    // GPU renderer with graceful degradation: webgl -> canvas -> DOM. The
+    // canvas fallback also covers GPU-less CI, so the fallback path is the
+    // one the verification suite actually exercises.
+    try {
+      const webgl = new window.WebglAddon.WebglAddon();
+      webgl.onContextLoss(() => {
+        try { webgl.dispose(); } catch (_) {}
+        try { term.loadAddon(new window.CanvasAddon.CanvasAddon()); } catch (_) {}
+      });
+      term.loadAddon(webgl);
+    } catch (_) {
+      try { term.loadAddon(new window.CanvasAddon.CanvasAddon()); } catch (_) {}
+    }
+    try {
+      term.loadAddon(new window.Unicode11Addon.Unicode11Addon());
+      term.unicode.activeVersion = "11"; // wide glyphs and emoji keep columns aligned
+    } catch (_) {}
+    // The GPU renderer keeps screen text out of the DOM (.xterm-rows stays
+    // empty), so the verification harness reads the terminal through this
+    // buffer probe instead.
+    window.__claudeampTermText = () => {
+      try {
+        const buf = term.buffer.active;
+        const rows = [];
+        for (let i = 0; i < term.rows; i++) {
+          const line = buf.getLine(buf.viewportY + i);
+          rows.push(line ? line.translateToString(true) : "");
+        }
+        return { rows, cursorRow: buf.cursorY };
+      } catch (_) { return { rows: [], cursorRow: -1 }; }
+    };
     const xtermRoot = $("term-holder").querySelector(".xterm");
     if (xtermRoot) xtermRoot.style.fontFamily = terminalFont;
     const terminalViewport = $("term-holder").querySelector(".xterm-viewport");
@@ -2133,6 +2249,13 @@
         // Closing counts as seen - the welcome must not nag every boot;
         // it stays reachable from the menu.
         store.setRaw(SETUP_KEY, "done");
+        // A returning shell-mode user dismissing the re-shown welcome still
+        // gets their terminal: the boot path skipped its shell startup
+        // because the welcome intercepted it. Unconditional on visibility -
+        // a restored layout can show win-term as a visible but never-booted
+        // shell, and setChatMode("shell") is what actually starts the PTY.
+        if (S.chatMode === "shell" && window.claudeampTerm)
+          setChatMode("shell");
       });
       $("wm-start").addEventListener("click", () => {
         if (wmPage === 1 && wmNeedsPage2()) { wmShowPage(2); return; }
@@ -2170,7 +2293,10 @@
     store.setRaw(SETUP_KEY, "done");
     const wantShell = mode === "shell" && !!window.claudeampTerm;
     S.chatMode = wantShell ? "shell" : "chat";
-    if (wantShell) S.provider = "claude-cli";
+    // Default the terminal's CLI only when the current provider has none -
+    // a Codex or Ollama user re-running the welcome keeps their choice
+    // instead of being silently switched to Claude Code.
+    if (wantShell && !provider().cli && S.provider !== "ollama") S.provider = "claude-cli";
     saveSettings();
     drawEqFace(); drawInfo();
     if (wantShell) {
@@ -2182,8 +2308,9 @@
     } else {
       if (mode === "shell") // asked for terminal but not the desktop app
         msgDiv("system", null, "THE REAL TERMINAL NEEDS THE CLAUDEAMP DESKTOP APP - USING CHAT INSTEAD.");
-      WM.toggle("win-chat", true);
-      WM.bringToFront($("win-chat"));
+      // Through setChatMode here too: it also reclaims the chat slot and
+      // hides a leftover terminal window, which a bare toggle left visible.
+      setChatMode("chat");
       renderLoginSteps();
     }
     initMenuOnboarding(true);
@@ -2683,6 +2810,9 @@
   function setZoom(z) {
     S.zoom = z;
     $("desktop").style.setProperty("--zoom", z);
+    // The desktop just changed size (layout width is viewport/zoom); pull
+    // any panel the shrink stranded back inside the reachable area.
+    WM.clampIntoDesktop();
     saveSettings();
   }
 
@@ -3380,6 +3510,10 @@
     }
   }
   function buildRain(previous = null) {
+    // Guard here, not only in rainFx: drawFx's mode/size switch calls
+    // buildRain directly, and without glyph data a first-frame throw would
+    // kill the whole render loop, not just the rain.
+    if (typeof GLYPHS === "undefined") return;
     // The backing follows the stage at exactly RAIN_SCALE on both axes. Cells
     // therefore remain twelve logical pixels tall regardless of the window's
     // aspect ratio; a larger stage gets more backing pixels and more lanes.
@@ -3401,7 +3535,12 @@
         let c = document.createElement("canvas");
         c.width = size.w; c.height = size.h;
         let ctx = c.getContext("2d");
-        rainGlyphPath(ctx, g, pad, pad, cell, "rgb(0,150,0)");
+        // Trail glyphs are solid character-green with their own soft glow -
+        // never a dark outline. The persistence fade supplies the gradient
+        // down the column; a fresh trail stamp starts at full brightness.
+        ctx.shadowColor = "rgba(0,255,0,.5)";
+        ctx.shadowBlur = cell * 0.25;
+        rainGlyphPath(ctx, g, pad, pad, cell, "#00FF00");
         trail.push(c);
         c = document.createElement("canvas");
         c.width = size.w; c.height = size.h;
@@ -3451,15 +3590,22 @@
     if (typeof GLYPHS === "undefined") return; // glyph data missing: draw nothing
     if (!rainState) buildRain();
     const { trail, head, pad, stepY, columns, count, W, H, surface, surfaceCtx } = rainState;
+    // Real elapsed time, like snakeGame: a fixed 1/60 step under
+    // requestAnimationFrame ran the rain at double speed (and halved the
+    // trail persistence) on 120 Hz displays. Capped so a background tab
+    // doesn't fast-forward on return.
+    const now = performance.now();
+    const dt = Math.min(0.05, (now - (rainState.clock || now)) / 1000);
+    rainState.clock = now;
     // Persistence: trail stamps dim slowly on the offscreen surface. Heads
     // are drawn onto the VISIBLE canvas every frame (constant glow, thick,
     // smooth) but never onto the surface - so their glow cannot accumulate
     // into a saturated blob that a later, darker trail stamp would read as
-    // a black character knocked out of green.
-    surfaceCtx.fillStyle = "rgba(0,0,0,0.034)";
+    // a black character knocked out of green. The fade scales with dt so
+    // trails persist the same wall-clock time at any refresh rate.
+    surfaceCtx.fillStyle = "rgba(0,0,0," + (1 - Math.pow(0.966, dt * 60)).toFixed(4) + ")";
     surfaceCtx.fillRect(0, 0, W, H);
     surfaceCtx.globalAlpha = 1;
-    const dt = 1 / 60;
     const pace = 1 + energy * 0.25; // original speed, swaying a touch with the music
     for (const col of columns) {
       col.acc += dt * col.rate * (col.burst > 0 ? 1.9 : 1) * pace;
@@ -3770,8 +3916,20 @@
       updateNotice = "NEW: CLAUDEAMP V" + String(info.version || "").toUpperCase() +
         " IS OUT - CLAUDEAMP.COM  ***  ";
     });
-  WM.init();
+  // Native menu bar: commands arrive from main by id; state flows back so
+  // the native checkmarks track the app (heartbeat catches visibility
+  // changes made with window buttons or drags).
+  if (window.claudeAmpDesktop && window.claudeAmpDesktop.onMenuCommand) {
+    window.claudeAmpDesktop.onMenuCommand(runMenuCommand);
+    setInterval(syncMenuState, 2000);
+    setTimeout(syncMenuState, 500);
+  }
+  // Zoom before layout: WM.init() clamps restored panels against the
+  // desktop's size, which depends on --zoom. At the default 1 the old order
+  // was harmless; at a saved 2x it clamped against a desktop twice as wide
+  // as the one the panels end up on.
   $("desktop").style.setProperty("--zoom", S.zoom);
+  WM.init();
   buildEqThumbs();
   drawEqFace(); drawEqGraph();
   Music.init({

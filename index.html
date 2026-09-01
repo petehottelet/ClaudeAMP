@@ -318,7 +318,8 @@
       <p class="legal-h">Privacy &amp; your data</p>
       <p>ClaudeAmp has no backend of its own &mdash; it runs entirely in your browser (or the local
       desktop shell) and collects <b>no analytics, no telemetry, and no accounts</b>. API keys you
-      enter live only in <b>this browser's <code>localStorage</code></b> and are never sent to a
+      enter stay on this machine &mdash; the desktop app encrypts them with <b>your OS keychain</b>,
+      a plain browser keeps them in <b>localStorage</b> &mdash; and are never sent to a
       ClaudeAmp server (there isn't one), so use personal keys you can revoke and clear them any time
       by emptying the fields and saving. When you pick an <b>API model</b> (Claude, OpenAI, Gemini)
       your messages go straight from your browser to that provider, handled under its own terms and
@@ -436,7 +437,7 @@
 <!-- ===================== MODERN SETTINGS (full-window overlay) ===================== -->
 
 <!-- ============ FIRST-RUN WELCOME (modern overlay, same design language
-     as the Settings panel; liquid glass on macOS) ============ -->
+     as the Settings panel; opaque on every platform) ============ -->
 <div id="welcome-modern" class="modern-ui" hidden>
   <main class="window" role="dialog" aria-modal="true" aria-labelledby="wm-title">
     <header class="header">
@@ -643,7 +644,7 @@
       <section class="section">
         <div class="section-head">
           <h2 class="section-title">API Keys <span style="font-weight:500;color:var(--muted);font-size:14px">(optional)</span></h2>
-          <p class="section-help">Only needed for the API-key providers. Stored in this browser's localStorage.</p>
+          <p class="section-help">Only needed for the API-key providers. The desktop app encrypts keys with your OS keychain; a plain browser stores them in localStorage.</p>
         </div>
         <div class="api-grid">
           <label class="api-label" for="sm-key-claude">Anthropic API key</label>
@@ -782,6 +783,7 @@
 </div>
 
 <script src="js/version.js"></script>
+<script src="js/menu-spec.js"></script>
 <script src="js/glyphs.js"></script>
 <script src="js/font.js"></script>
 <script src="js/windows.js"></script>

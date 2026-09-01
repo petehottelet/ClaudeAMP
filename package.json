@@ -1,7 +1,7 @@
 {
   "name": "claudeamp",
   "productName": "ClaudeAmp",
-  "version": "1.7.1",
+  "version": "1.7.2",
   "description": "A classically-styled terminal interface for Claude Code, OpenAI Codex, and Ollama. For Windows, macOS, and Linux.",
   "main": "electron/main.cjs",
   "author": "Pete Hottelet",
@@ -100,8 +100,6 @@
     "nsis": {
       "oneClick": false,
       "deleteAppDataOnUninstall": true,
-      "installerIcon": "assets/claw-mark.ico",
-      "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "ClaudeAmp",
@@ -144,7 +142,10 @@
     }
   },
   "dependencies": {
+    "@xterm/addon-canvas": "^0.7.0",
     "@xterm/addon-fit": "^0.10.0",
+    "@xterm/addon-unicode11": "^0.8.0",
+    "@xterm/addon-webgl": "^0.18.0",
     "@xterm/xterm": "^5.5.0"
   },
   "optionalDependencies": {

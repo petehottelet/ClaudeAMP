@@ -62,7 +62,8 @@ those are not commits and do not affect the contributors graph.)
   the same composition full-bleed (radius scaled as 185/824), all nine
   .ico sizes regenerated together. Inside the app UI only the
   transparent art (`assets/claw-mark.png`, the stacked logo) is ever
-  used — never the solid-background icon. The installer's own UI (the
-  Setup window icon and anything shown while installing) also uses the
-  transparent art: `nsis.installerIcon` points at `assets/claw-mark.ico`
-  and must never be switched to the solid icon.
+  used — never the solid-background icon. BOTH Windows executables
+  (Setup.exe and the installed app) embed the same filled rounded icon:
+  `nsis.installerIcon` stays unset so the installer inherits `win.icon`.
+  Do not reintroduce a transparent installer icon — the owner reversed
+  that experiment after seeing it in the taskbar.

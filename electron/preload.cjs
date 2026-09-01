@@ -42,6 +42,12 @@ contextBridge.exposeInMainWorld("claudeAmpDesktop", Object.freeze({
     ipcRenderer.on("claudeamp:update-available", listener);
     return () => ipcRenderer.removeListener("claudeamp:update-available", listener);
   },
+  onMenuCommand: callback => {
+    const listener = (_event, id) => callback(String(id || ""));
+    ipcRenderer.on("claudeamp:menu-command", listener);
+    return () => ipcRenderer.removeListener("claudeamp:menu-command", listener);
+  },
+  setMenuState: state => ipcRenderer.send("claudeamp:menu-state", state),
 }));
 
 contextBridge.exposeInMainWorld("claudeampTerm", Object.freeze({

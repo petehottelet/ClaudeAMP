@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClaudeAmp — Winamp-style desktop client for Claude Code, Codex, and Ollama</title>
+<meta name="description" content="ClaudeAmp is a classically-styled desktop terminal and chat client for Claude Code, OpenAI Codex, and Ollama — with a retro music player, equalizer model tuning, and a real PTY terminal. Free for Windows, macOS, and Linux.">
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="canonical" href="https://www.claudeamp.com/">
+<meta property="og:title" content="ClaudeAmp">
+<meta property="og:description" content="The retro music player that runs your favorite LLM. Claude Code, Codex, and Ollama in a Winamp-style desktop app for Windows, macOS, and Linux.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://www.claudeamp.com/">
+<meta property="og:image" content="https://www.claudeamp.com/assets/claudeamp-interface.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --void: #07080E;
+    --panel: #14162A;
+    --panel-hi: #23264a;
+    --bevel-hi: #3E4270;
+    --bevel-lo: #04050A;
+    --lcd: #00FF41;
+    --lcd-dim: #0A9C36;
+    --gold: #F6C52F;
+    --amp: #F78D1A;
+    --fog: #A9B2CE;
+    --display: "Silkscreen", "Courier New", monospace;
+    --mono: "IBM Plex Mono", "Menlo", "Consolas", monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--void);
+    color: var(--fog);
+    font-family: var(--mono);
+    font-size: 16px;
+    line-height: 1.65;
+  }
+  a { color: var(--lcd); }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  img { max-width: 100%; display: block; }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 0 24px; }
+
+  /* ---------- hero ---------- */
+  .hero { position: relative; overflow: hidden; border-bottom: 1px solid var(--bevel-hi); }
+  #rain { position: absolute; inset: 0; width: 100%; height: 100%; opacity: .34; }
+  .hero-inner { position: relative; padding: 72px 24px 56px; text-align: center; }
+  .hero-logo { width: min(720px, 92%); height: auto; margin: 0 auto 10px; filter: drop-shadow(0 6px 24px rgba(247,141,26,.25)); }
+  .tagline {
+    font-family: var(--display);
+    color: var(--gold);
+    font-size: clamp(14px, 2.6vw, 22px);
+    letter-spacing: .04em;
+    margin: 18px auto 10px;
+    text-wrap: balance;
+    max-width: 30ch;
+  }
+  .sub { max-width: 62ch; margin: 0 auto 30px; color: var(--fog); }
+  .sub b { color: #E8ECFA; font-weight: 600; }
+  .cta-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin-bottom: 14px; }
+  .btn {
+    font-family: var(--display);
+    font-size: 13px;
+    text-decoration: none;
+    padding: 13px 22px 11px;
+    color: var(--void);
+    background: linear-gradient(180deg, #FFC43C 0%, var(--amp) 100%);
+    border: 1px solid var(--bevel-lo);
+    box-shadow: inset 1px 1px 0 rgba(255,255,255,.55), inset -1px -1px 0 rgba(0,0,0,.35), 0 4px 18px rgba(247,141,26,.3);
+  }
+  .btn:hover { filter: brightness(1.07); }
+  .btn.ghost {
+    color: var(--lcd);
+    background: var(--panel);
+    box-shadow: inset 1px 1px 0 var(--bevel-hi), inset -1px -1px 0 var(--bevel-lo);
+  }
+  .fine { font-size: 12.5px; color: #6E7796; }
+  .fine a { color: #9aa5c6; }
+
+  /* ---------- screenshot in app chrome ---------- */
+  .deck { position: relative; padding: 34px 24px 84px; }
+  .app-window {
+    max-width: 980px; margin: 0 auto;
+    background: linear-gradient(135deg, #181818 0%, #383858 50%, #181818 100%);
+    border: 1px solid var(--bevel-lo);
+    box-shadow: inset 1px 1px 0 var(--bevel-hi), inset -1px -1px 0 var(--bevel-lo), 0 30px 80px rgba(0,0,0,.6);
+    padding: 3px;
+  }
+  .titlebar {
+    display: flex; align-items: center; justify-content: space-between;
+    height: 22px; padding: 0 7px;
+    font-family: var(--display); font-size: 10px; letter-spacing: .12em;
+    color: var(--gold);
+    background: linear-gradient(180deg, #2A2C4E 0%, #14162A 100%);
+    border-bottom: 1px solid var(--bevel-lo);
+  }
+  .titlebar .dots span {
+    display: inline-block; width: 9px; height: 9px; margin-left: 4px;
+    background: var(--panel-hi);
+    box-shadow: inset 1px 1px 0 var(--bevel-hi), inset -1px -1px 0 var(--bevel-lo);
+  }
+  .app-window img { width: 100%; height: auto; }
+
+  /* ---------- features ---------- */
+  .features { border-top: 1px solid var(--bevel-hi); background: #0A0C18; }
+  .features .wrap { padding-top: 70px; padding-bottom: 40px; }
+  .eyebrow {
+    font-family: var(--display); font-size: 11px; letter-spacing: .28em;
+    color: var(--lcd-dim); text-transform: uppercase; margin: 0 0 8px;
+  }
+  h2 {
+    font-family: var(--display); font-weight: 700; color: #E8ECFA;
+    font-size: clamp(18px, 3vw, 26px); letter-spacing: .02em;
+    margin: 0 0 40px; text-wrap: balance;
+  }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 18px; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--bevel-lo);
+    box-shadow: inset 1px 1px 0 var(--bevel-hi), inset -1px -1px 0 var(--bevel-lo);
+    padding: 24px 22px;
+  }
+  .card h3 {
+    font-family: var(--display); font-size: 13px; color: var(--gold);
+    letter-spacing: .06em; margin: 0 0 12px;
+  }
+  .card p { margin: 0; font-size: 14.5px; color: var(--fog); }
+  .card p code { color: var(--lcd); font-family: var(--mono); font-size: 13.5px; }
+
+  /* ---------- download ---------- */
+  .downloads .wrap { padding-top: 64px; padding-bottom: 72px; }
+  .dl-table { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+  .dl {
+    display: block; text-decoration: none;
+    background: var(--panel); border: 1px solid var(--bevel-lo);
+    box-shadow: inset 1px 1px 0 var(--bevel-hi), inset -1px -1px 0 var(--bevel-lo);
+    padding: 18px 20px;
+  }
+  .dl:hover { background: #1A1D38; }
+  .dl .os { font-family: var(--display); font-size: 12px; color: #E8ECFA; letter-spacing: .08em; }
+  .dl .kind { font-size: 13px; color: var(--lcd); margin-top: 6px; }
+  .dl-note { margin-top: 22px; font-size: 13px; color: #6E7796; max-width: 70ch; }
+  .dl-note a { color: #9aa5c6; }
+
+  /* ---------- footer ---------- */
+  footer { border-top: 1px solid var(--bevel-hi); }
+  footer .wrap { padding: 34px 24px 44px; display: flex; flex-wrap: wrap; gap: 18px; justify-content: space-between; font-size: 13px; color: #6E7796; }
+  footer a { color: #9aa5c6; }
+  footer .legal { max-width: 62ch; }
+
+  @media (prefers-reduced-motion: reduce) { #rain { display: none; } }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <canvas id="rain" aria-hidden="true"></canvas>
+  <div class="hero-inner">
+    <img class="hero-logo" src="assets/claudeamp-logo.png" alt="ClaudeAmp" width="1600" height="321">
+    <p class="tagline">The retro music player that runs your favorite LLM.</p>
+    <p class="sub">A classically-styled desktop client for <b>Claude Code</b>, <b>OpenAI Codex</b>, and <b>Ollama</b> —
+       a real terminal and an AI chat inside a Winamp-style deck, with an equalizer that tunes your
+       model and 30-second previews on the playlist while you work.</p>
+    <div class="cta-row">
+      <a class="btn" href="https://github.com/petehottelet/claudeamp/releases/latest">DOWNLOAD FREE</a>
+      <a class="btn ghost" href="https://github.com/petehottelet/claudeamp">VIEW SOURCE</a>
+    </div>
+    <p class="fine">Windows &middot; macOS &middot; Linux &mdash; MIT licensed, verified releases</p>
+  </div>
+</header>
+
+<section class="deck" aria-label="ClaudeAmp interface">
+  <div class="app-window">
+    <div class="titlebar"><span>CLAUDEAMP</span><span class="dots" aria-hidden="true"><span></span><span></span><span></span></span></div>
+    <img src="assets/claudeamp-interface.png" alt="ClaudeAmp desktop: terminal running Claude Code, playlist, equalizer model tuner, usage monitor, and glyph-rain visualization" width="1368" height="973" loading="lazy">
+  </div>
+</section>
+
+<section class="features">
+  <div class="wrap">
+    <p class="eyebrow">What's in the deck</p>
+    <h2>Your CLI, with a soundtrack.</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>A REAL TERMINAL</h3>
+        <p>A true PTY running your login shell, skinned like it's 1998. Claude Code, Codex, or
+           <code>ollama run</code> auto-starts in Terminal mode — or use the chat window and keep
+           your conversation docked next to the playlist.</p>
+      </div>
+      <div class="card">
+        <h3>EQ THAT TUNES THE AI</h3>
+        <p>The equalizer is the model panel: pick the brain on the left slider, shape effort,
+           thinking, and personality on the bands. The usage monitor keeps tokens-per-turn and
+           spend on an LCD readout.</p>
+      </div>
+      <div class="card">
+        <h3>MUSIC WHILE YOU SHIP</h3>
+        <p>Fifty iTunes previews out of the box, YouTube and Spotify if you bring accounts,
+           windowshade panels, docking with snap, and the glyph-rain visualizer running the
+           whole time.</p>
+      </div>
+      <div class="card">
+        <h3>PRIVATE BY DEFAULT</h3>
+        <p>Read-only CLI access unless you opt in, API keys in the OS keychain, and a local
+           bridge that never exposes its token to the network. Every release ships with
+           <code>SHA256SUMS.txt</code> and is self-verified on all three platforms before it publishes.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="downloads">
+  <div class="wrap">
+    <p class="eyebrow">Get ClaudeAmp</p>
+    <h2>Free. Three platforms. One deck.</h2>
+    <div class="dl-table">
+      <a class="dl" href="https://github.com/petehottelet/claudeamp/releases/latest"><span class="os">WINDOWS</span><span class="kind">Installer (.exe)</span></a>
+      <a class="dl" href="https://github.com/petehottelet/claudeamp/releases/latest"><span class="os">MACOS</span><span class="kind">Apple Silicon &amp; Intel (.dmg)</span></a>
+      <a class="dl" href="https://github.com/petehottelet/claudeamp/releases/latest"><span class="os">LINUX</span><span class="kind">AppImage (x86_64)</span></a>
+    </div>
+    <p class="dl-note">Every asset is listed with its checksum on the
+      <a href="https://github.com/petehottelet/claudeamp/releases/latest">latest release</a>.
+      macOS builds are currently unsigned — right-click the app and choose Open on first launch.</p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span><a href="https://github.com/petehottelet/claudeamp">github.com/petehottelet/claudeamp</a> &middot; MIT License</span>
+    <span class="legal">Not affiliated with Winamp, Nullsoft, AOL, Anthropic, OpenAI, Google, YouTube, or Ollama.</span>
+  </div>
+</footer>
+
+<script>
+(() => {
+  const canvas = document.getElementById("rain");
+  if (!canvas || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const ctx = canvas.getContext("2d");
+  const CHARS = "アカサタナハマヤラワ0123456789ΛΞΣΨΔ<>[]#$+=";
+  let cols = [], W = 0, H = 0, cell = 18;
+  function size() {
+    const r = canvas.parentElement.getBoundingClientRect();
+    W = canvas.width = Math.floor(r.width);
+    H = canvas.height = Math.floor(r.height);
+    const n = Math.ceil(W / cell);
+    cols = Array.from({ length: n }, (_, i) => ({
+      x: i * cell, y: Math.random() * -H, v: 60 + Math.random() * 140,
+    }));
+    ctx.fillStyle = "#07080E";
+    ctx.fillRect(0, 0, W, H);
+  }
+  size();
+  addEventListener("resize", size);
+  let last = performance.now();
+  (function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    ctx.fillStyle = "rgba(7,8,14,0.12)";
+    ctx.fillRect(0, 0, W, H);
+    ctx.font = "15px 'IBM Plex Mono', monospace";
+    for (const c of cols) {
+      c.y += c.v * dt;
+      if (c.y > H + 60) { c.y = Math.random() * -120; c.v = 60 + Math.random() * 140; }
+      ctx.fillStyle = "#00FF41";
+      ctx.fillText(CHARS[(Math.random() * CHARS.length) | 0], c.x, c.y);
+      ctx.fillStyle = "rgba(0,255,65,0.35)";
+      ctx.fillText(CHARS[(Math.random() * CHARS.length) | 0], c.x, c.y - cell);
+    }
+    requestAnimationFrame(frame);
+  })(performance.now());
+})();
+</script>
+
+</body>
+</html>

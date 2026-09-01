@@ -6,7 +6,7 @@
   </p>
 
   <p>
-    <a href="https://github.com/petehottelet/claudeamp/releases/latest"><img src="assets/badges/version.svg" alt="ClaudeAmp version 1.7.1"></a>
+    <a href="https://github.com/petehottelet/claudeamp/releases/latest"><img src="assets/badges/version.svg" alt="ClaudeAmp version 1.7.2"></a>
     <a href="https://github.com/petehottelet/claudeamp/actions/workflows/verify.yml"><img src="https://github.com/petehottelet/claudeamp/actions/workflows/verify.yml/badge.svg?branch=main" alt="ClaudeAmp verification status"></a>
     <img src="assets/badges/platforms.svg" alt="Desktop: Windows, macOS, and Linux">
     <a href="LICENSE"><img src="assets/badges/license.svg" alt="License: MIT"></a>
@@ -49,12 +49,12 @@ npm run dist          # build installers for the current platform
 ```
 
 The installed app starts its loopback-only CLI/search bridge automatically.
-The first launch opens at crisp 1.5× scale and runs a setup wizard right in the
-terminal window: pick your model provider and access method (subscription CLI, API
-key, or local Ollama) with the arrow keys, paste a key if that path needs
-one, then choose whether the main window is the AI chat or a **real
-terminal** that auto-runs the CLI for the provider you picked (Claude Code,
-Codex, or `ollama run`). Everything the wizard sets — and the wizard
+The first launch opens at crisp 1.5× scale and shows a full-window welcome
+screen: pick your model provider and access method (subscription CLI, API
+key, or local Ollama), paste a key if that path needs one, then choose
+whether the main window is the AI chat or a **real terminal** that
+auto-runs the CLI for the provider you picked (Claude Code, Codex, or
+`ollama run`). Everything the welcome screen sets — and the screen
 itself — stays reachable from the main-window hamburger menu.
 Use **Options** to choose read-only or workspace access and the folder Claude
 Code/Codex may work in. Read-only is the default and really is read-only
@@ -114,10 +114,10 @@ The desktop app also wraps a genuine terminal in the skin chrome: the
 **CLAUDEAMP SHELL** window hosts a real PTY (PowerShell on Windows, your
 login shell on macOS) rendered by xterm.js in classic green-on-black, so you
 can run anything there — including `claude` itself. Pick **Mode: Real
-Terminal** in the menu (or in the setup wizard) and the shell replaces the
+Terminal** in the menu (or on the welcome screen) and the shell replaces the
 chat window outright, auto-launching the CLI for your selected provider.
 
-Tagged releases (`git tag v1.7.1 && git push origin v1.7.1`) build the installers
+Tagged releases (`git tag v1.7.2 && git push origin v1.7.2`) build the installers
 automatically via GitHub Actions and attach them to the GitHub release, so
 users pick `ClaudeAmp-Setup-<version>.exe` or `ClaudeAmp-<version>-<arch>.dmg`
 from the same [Releases page](https://github.com/petehottelet/claudeamp/releases/latest).
@@ -159,11 +159,13 @@ in right-click → **Options…** (or the `O` on the main window's left edge):
 | **Codex CLI (subscription)** | none — your `codex` CLI login | `bridge.js` spawns `codex exec --json` |
 | **Ollama Local** | none | loopback bridge → local Ollama `/api/tags` + `/api/chat` |
 
-> API keys live in your browser's localStorage only — use personal keys you
-> can revoke, and don't host this publicly with shared keys. The
-> subscription CLIs never see a key at all: `bridge.js` binds to
-> `127.0.0.1`, rejects cross-origin calls, and simply relays prompts to the
-> CLI you already logged into. Your credentials stay inside the CLI.
+> In the desktop app, API keys are encrypted at rest with your OS keychain
+> (Electron `safeStorage`); running as a plain web page they live in the
+> browser's localStorage. Either way, use personal keys you can revoke, and
+> don't host this publicly with shared keys. The subscription CLIs never
+> see a key at all: `bridge.js` binds to `127.0.0.1`, rejects cross-origin
+> calls, and simply relays prompts to the CLI you already logged into. Your
+> credentials stay inside the CLI.
 
 For a local model, install Ollama, start its local service, and pull at least
 one model (for example, `ollama pull llama3.2`). Choose **Ollama Local** in

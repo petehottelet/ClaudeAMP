@@ -11,9 +11,15 @@ const changelog = fs.readFileSync(path.join(root, "CHANGELOG.md"), "utf8");
 const version = require("../package.json").version;
 
 test("release notes use the current changelog section only", () => {
+  // Structure, not prose: the current version's section must exist and
+  // contain no other version's heading. The extractor's slicing is pinned
+  // against a FROZEN historical section, so this test survives releases.
   const section = extractVersionSection(changelog, version);
-  assert.match(section, /welcome screen runs again/i);
-  assert.doesNotMatch(section, /First release from the re-founded repository/i);
+  assert.ok(section.length > 40, "current version section looks empty");
+  assert.doesNotMatch(section, /^## \[/m);
+  const frozen = extractVersionSection(changelog, "1.7.1");
+  assert.match(frozen, /welcome screen runs again/i);
+  assert.doesNotMatch(frozen, /First release from the re-founded repository/i);
 });
 
 test("release notes name every supported installer and checksum file", () => {
