@@ -4,7 +4,7 @@ Notable changes to ClaudeAmp. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 the `package.json` version, which CI requires to agree with `js/version.js`.
 
-## [Unreleased]
+## [1.7.3] - 2026-09-01
 
 ### Fixed
 - Terminal: the top of the window no longer stays black with text

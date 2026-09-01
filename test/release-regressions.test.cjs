@@ -25,7 +25,7 @@ const radio = read("js/radio.js");
 
 test("release version agrees across package, lockfile, and UI", () => {
   const uiVersion = versionSource.match(/CLAUDEAMP_VERSION\s*=\s*"([^"]+)"/)?.[1];
-  assert.equal(pkg.version, "1.7.2");
+  assert.equal(pkg.version, "1.7.3");
   assert.equal(lock.version, pkg.version);
   assert.equal(lock.packages[""].version, pkg.version);
   assert.equal(uiVersion, pkg.version);
