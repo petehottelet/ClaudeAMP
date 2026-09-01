@@ -602,7 +602,12 @@ async function runVerifyProof(window) {
       { terminalTop: restored.terminalTop, mainTop: restored.mainTop });
     check("terminalHidesDiagnostics", !/\[claudeamp\]|host:|pty\.spawn|readiness round trip/i.test(restoredText),
       restoredText.slice(0, 240));
-    check("terminalUsesBlockFont", /Lucida Console/i.test(String(restored.fontFamily || "")),
+    // macOS uses Menlo/Monaco (it ships neither Lucida Console nor Cascadia
+    // Mono, and Courier New garbles the CLI's block art); everywhere else
+    // the classic Lucida Console stack applies.
+    check("terminalUsesBlockFont", process.platform === "darwin"
+      ? /Menlo/i.test(String(restored.fontFamily || ""))
+      : /Lucida Console/i.test(String(restored.fontFamily || "")),
       restored.fontFamily || "missing");
     if (process.platform === "win32")
       check("terminalCursorOnPrompt", restored.cursorRow >= 0 && restored.cursorRow === restored.promptRow,
