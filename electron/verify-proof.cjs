@@ -41,7 +41,7 @@ async function runVerifyProof(window) {
         columns: grid ? getComputedStyle(grid).gridTemplateColumns : '',
         rects,
       };
-      try { localStorage.setItem('claudeamp.onboarding.setup.v1', 'done'); } catch (_) {}
+      try { localStorage.setItem('claudeamp.onboarding.setup.v2', 'done'); } catch (_) {}
       const overlay = document.getElementById('welcome-modern');
       if (overlay) overlay.hidden = true;
       const tip = document.getElementById('menu-onboarding');

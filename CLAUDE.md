@@ -10,8 +10,10 @@ these in the About panel (they mirror `package.json`):
   Code, OpenAI Codex, and Ollama. For Windows, macOS, and Linux.`
 - Website: `https://www.claudeamp.com` (hosted on Vercel — independent
   of this repository)
-- Topics: `ai-chat`, `claude-code`, `codex-cli`, `electron`, `ollama`,
-  `terminal`, `desktop-app`, `music-player`
+- Topics: `ai-chat`, `claude-code`, `codex-cli`, `desktop-app`,
+  `electron`, `music-player`, `ollama`, `terminal`, `ai`, `claude`,
+  `codex`, `developer-tools`, `electron-app`, `linux`, `llm`,
+  `local-ai`, `macos`, `openai-codex`, `terminal-emulator`, `windows`
 
 ## Attribution: never add yourself as a contributor
 

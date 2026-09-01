@@ -3,9 +3,9 @@
 Release work must start from the current remote `main`. The regression tests deliberately assert the features that were lost when an installer was once built from an obsolete checkout.
 
 GitHub Actions runs the full Electron, window-shape, bridge, playback, and PTY
-proof on Windows. The hosted macOS 26 ARM image currently returns
-`posix_spawnp failed` for node-pty shell launches, so macOS CI runs the complete
-source suite and publishes test builds for validation on a normal Mac.
+proof on both Windows and macOS before any installer builds. The postinstall
+patch restores node-pty's executable bits on macOS so the hosted ARM runner can
+exercise a real shell rather than relying on source-only checks.
 
 ## Required checks
 
@@ -47,3 +47,6 @@ Public Windows installers should be Authenticode-signed. Electron Builder uses `
 - The installer has a unique version and filename.
 - SHA-256 and Authenticode status are recorded.
 - Installer, block map, and `latest.yml` are archived together.
+- The generated release notes match the version's `CHANGELOG.md` entry.
+- Delete the one-shot `release/v<version>` branch after the release and checksum
+  verification complete; the tag and release retain the permanent history.
