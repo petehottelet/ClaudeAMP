@@ -404,6 +404,13 @@ test("Windows taskbar icon has a real packaged path and upgrade-time pin repair"
   assert.match(installer, /WinShell::SetLnkAUMI[\s\S]*\$\{APP_ID\}/);
   assert.match(installer, /SHChangeNotify/);
   assert.match(installer, /ie4uinit\.exe[\s\S]*-show/);
+  // allowToChangeInstallationDirectory forces keep-shortcuts OFF in
+  // electron-builder's NSIS templates (installUtil.nsh) for every run
+  // without --updated - and nothing here ever passes --updated. With it
+  // set, every manual upgrade unpinned the taskbar icon and recreated
+  // user-deleted shortcuts, and the pin repair above could never run.
+  assert.equal(pkg.build.nsis.allowToChangeInstallationDirectory, undefined,
+    "allowToChangeInstallationDirectory kills upgrade-time shortcut keeping");
 });
 
 test("Setup.exe embeds the same filled brand icon as the desktop app", () => {

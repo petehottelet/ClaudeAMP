@@ -100,7 +100,6 @@
     "nsis": {
       "oneClick": false,
       "deleteAppDataOnUninstall": true,
-      "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "ClaudeAmp",

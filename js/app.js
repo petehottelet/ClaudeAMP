@@ -2251,8 +2251,10 @@
         store.setRaw(SETUP_KEY, "done");
         // A returning shell-mode user dismissing the re-shown welcome still
         // gets their terminal: the boot path skipped its shell startup
-        // because the welcome intercepted it.
-        if (S.chatMode === "shell" && window.claudeampTerm && !WM.visible("win-term"))
+        // because the welcome intercepted it. Unconditional on visibility -
+        // a restored layout can show win-term as a visible but never-booted
+        // shell, and setChatMode("shell") is what actually starts the PTY.
+        if (S.chatMode === "shell" && window.claudeampTerm)
           setChatMode("shell");
       });
       $("wm-start").addEventListener("click", () => {
@@ -2291,7 +2293,10 @@
     store.setRaw(SETUP_KEY, "done");
     const wantShell = mode === "shell" && !!window.claudeampTerm;
     S.chatMode = wantShell ? "shell" : "chat";
-    if (wantShell) S.provider = "claude-cli";
+    // Default the terminal's CLI only when the current provider has none -
+    // a Codex or Ollama user re-running the welcome keeps their choice
+    // instead of being silently switched to Claude Code.
+    if (wantShell && !provider().cli && S.provider !== "ollama") S.provider = "claude-cli";
     saveSettings();
     drawEqFace(); drawInfo();
     if (wantShell) {
@@ -2303,8 +2308,9 @@
     } else {
       if (mode === "shell") // asked for terminal but not the desktop app
         msgDiv("system", null, "THE REAL TERMINAL NEEDS THE CLAUDEAMP DESKTOP APP - USING CHAT INSTEAD.");
-      WM.toggle("win-chat", true);
-      WM.bringToFront($("win-chat"));
+      // Through setChatMode here too: it also reclaims the chat slot and
+      // hides a leftover terminal window, which a bare toggle left visible.
+      setChatMode("chat");
       renderLoginSteps();
     }
     initMenuOnboarding(true);
@@ -2804,6 +2810,9 @@
   function setZoom(z) {
     S.zoom = z;
     $("desktop").style.setProperty("--zoom", z);
+    // The desktop just changed size (layout width is viewport/zoom); pull
+    // any panel the shrink stranded back inside the reachable area.
+    WM.clampIntoDesktop();
     saveSettings();
   }
 
@@ -3501,6 +3510,10 @@
     }
   }
   function buildRain(previous = null) {
+    // Guard here, not only in rainFx: drawFx's mode/size switch calls
+    // buildRain directly, and without glyph data a first-frame throw would
+    // kill the whole render loop, not just the rain.
+    if (typeof GLYPHS === "undefined") return;
     // The backing follows the stage at exactly RAIN_SCALE on both axes. Cells
     // therefore remain twelve logical pixels tall regardless of the window's
     // aspect ratio; a larger stage gets more backing pixels and more lanes.
@@ -3577,15 +3590,22 @@
     if (typeof GLYPHS === "undefined") return; // glyph data missing: draw nothing
     if (!rainState) buildRain();
     const { trail, head, pad, stepY, columns, count, W, H, surface, surfaceCtx } = rainState;
+    // Real elapsed time, like snakeGame: a fixed 1/60 step under
+    // requestAnimationFrame ran the rain at double speed (and halved the
+    // trail persistence) on 120 Hz displays. Capped so a background tab
+    // doesn't fast-forward on return.
+    const now = performance.now();
+    const dt = Math.min(0.05, (now - (rainState.clock || now)) / 1000);
+    rainState.clock = now;
     // Persistence: trail stamps dim slowly on the offscreen surface. Heads
     // are drawn onto the VISIBLE canvas every frame (constant glow, thick,
     // smooth) but never onto the surface - so their glow cannot accumulate
     // into a saturated blob that a later, darker trail stamp would read as
-    // a black character knocked out of green.
-    surfaceCtx.fillStyle = "rgba(0,0,0,0.034)";
+    // a black character knocked out of green. The fade scales with dt so
+    // trails persist the same wall-clock time at any refresh rate.
+    surfaceCtx.fillStyle = "rgba(0,0,0," + (1 - Math.pow(0.966, dt * 60)).toFixed(4) + ")";
     surfaceCtx.fillRect(0, 0, W, H);
     surfaceCtx.globalAlpha = 1;
-    const dt = 1 / 60;
     const pace = 1 + energy * 0.25; // original speed, swaying a touch with the music
     for (const col of columns) {
       col.acc += dt * col.rate * (col.burst > 0 ? 1.9 : 1) * pace;
@@ -3904,8 +3924,12 @@
     setInterval(syncMenuState, 2000);
     setTimeout(syncMenuState, 500);
   }
-  WM.init();
+  // Zoom before layout: WM.init() clamps restored panels against the
+  // desktop's size, which depends on --zoom. At the default 1 the old order
+  // was harmless; at a saved 2x it clamped against a desktop twice as wide
+  // as the one the panels end up on.
   $("desktop").style.setProperty("--zoom", S.zoom);
+  WM.init();
   buildEqThumbs();
   drawEqFace(); drawEqGraph();
   Music.init({

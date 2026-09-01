@@ -116,11 +116,16 @@ function safeShape(rects) {
   if (!win || win.isDestroyed() || !Array.isArray(rects)) return [];
   const { width: maxWidth, height: maxHeight } = win.getContentBounds();
   return rects.slice(0, 64).map(rect => {
-    const x = Math.max(0, Math.floor(Number(rect?.x) || 0));
-    const y = Math.max(0, Math.floor(Number(rect?.y) || 0));
-    const width = Math.max(0, Math.min(maxWidth - x, Math.ceil(Number(rect?.width) || 0)));
-    const height = Math.max(0, Math.min(maxHeight - y, Math.ceil(Number(rect?.height) || 0)));
-    return { x, y, width, height };
+    // True intersection with the content bounds. Clamping x to 0 while
+    // leaving the width alone would slide a panel hanging off the left
+    // edge back on screen as a phantom clickable strip at x=0.
+    const left = Math.floor(Number(rect?.x) || 0);
+    const top = Math.floor(Number(rect?.y) || 0);
+    const right = Math.min(maxWidth, left + Math.ceil(Number(rect?.width) || 0));
+    const bottom = Math.min(maxHeight, top + Math.ceil(Number(rect?.height) || 0));
+    const x = Math.max(0, left);
+    const y = Math.max(0, top);
+    return { x, y, width: right - x, height: bottom - y };
   }).filter(rect => rect.width > 0 && rect.height > 0);
 }
 

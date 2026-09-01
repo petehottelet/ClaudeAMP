@@ -22,6 +22,22 @@ the `package.json` version, which CI requires to agree with `js/version.js`.
   outline - no stray black pixels under the tip.
 - A returning Terminal-mode user who dismisses the re-shown welcome
   with its close button still gets their terminal opened.
+- Re-running the welcome no longer switches a signed-in Codex or Ollama
+  user back to Claude, and finishing it in chat mode now puts the chat
+  window back if the terminal was showing.
+- Windows: upgrades keep your taskbar pin and respect a deleted desktop
+  shortcut, and the pin's icon is repaired during the upgrade. (The
+  installer's choose-a-directory page is gone - it silently forced
+  shortcut recreation on every upgrade.)
+- Releases are published as prereleases until every installer and its
+  checksum are verified, so the "latest" release - the install script
+  and the in-app update check read it - can never be empty or partial.
+- The rain screensaver paces by real elapsed time (no more double-speed
+  fall on 120 Hz displays) and survives a missing glyph sheet.
+- Saved layouts restore correctly when panels were hidden or the zoom
+  differed, and changing zoom pulls stranded panels back on screen.
+- macOS: a panel hanging off the left edge of the screen no longer
+  leaves a phantom click-swallowing strip at the desktop's left edge.
 
 ### Added
 - macOS: a native menu bar mirroring the in-app menu - ClaudeAmp, File,
