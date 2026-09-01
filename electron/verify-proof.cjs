@@ -180,8 +180,8 @@ async function runVerifyProof(window) {
         menuLeft: menuRect.left, menuRight: menuRect.right,
       };
     })()`);
-    check("onboardingArrowCompact", onboardingArrow.width <= 12 * onboardingArrow.zoom + 0.5 &&
-      onboardingArrow.height <= 8 * onboardingArrow.zoom + 0.5, onboardingArrow);
+    check("onboardingArrowCompact", onboardingArrow.width <= 16 * onboardingArrow.zoom + 0.5 &&
+      onboardingArrow.height <= 10 * onboardingArrow.zoom + 0.5, onboardingArrow);
     check("onboardingArrowPointsAtMenu", onboardingArrow.arrowCenter >= onboardingArrow.menuLeft &&
       onboardingArrow.arrowCenter <= onboardingArrow.menuRight, onboardingArrow);
     let onboardingArrowInNativeShape = false;

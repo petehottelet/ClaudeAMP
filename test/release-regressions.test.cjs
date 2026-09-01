@@ -102,11 +102,14 @@ test("real terminal remains packaged, reachable, and covered by verification", (
   assert.match(app, /WM\.visible\("win-term"\)[\s\S]*openTerminal\(shellAutoCommand\(\)\)/);
   assert.match(app, /"Lucida Console", "Menlo", "Cascadia Mono", "Courier New"/);
   // Block art renders cell-exact regardless of font, at integer cell
-  // heights, through the GPU renderer with a canvas fallback; truecolor
-  // TUIs get their real colors.
+  // heights, through the canvas renderer; truecolor TUIs get their real
+  // colors. The WebGL addon must stay out: under the desktop's CSS zoom
+  // it painted the grid into the bottom-left 1/zoom of its canvas,
+  // leaving the top of every zoomed terminal black.
   assert.match(app, /customGlyphs:\s*true/);
   assert.match(app, /fontSize:\s*12\b/);
-  assert.match(app, /addon-webgl\/lib\/addon-webgl\.js/);
+  assert.doesNotMatch(app, /WebglAddon/);
+  assert.doesNotMatch(app, /addon-webgl/);
   assert.match(app, /CanvasAddon\.CanvasAddon\(\)/);
   assert.match(app, /Unicode11Addon\(\)/);
   assert.match(main, /COLORTERM\s*=\s*"truecolor"/);
@@ -131,10 +134,15 @@ test("near-aligned docked windows weld to the exact same top or left edge", () =
 });
 
 test("onboarding tooltip uses the compact native-size pointer from the mockup", () => {
-  assert.match(css, /\.onboarding-arrow\s*\{[^}]*left:\s*6\.5px/s);
-  assert.match(css, /\.onboarding-arrow\s*\{[^}]*width:\s*12px;\s*height:\s*8px/s);
-  assert.match(css, /\.onboarding-arrow\s*\{[^}]*background-size:\s*12px 8px/s);
+  // 16x10 with a uniform 2px outline: the 12x8 caret's 1px staircase read
+  // as stray black squares once the desktop zoom scaled it up.
+  assert.match(css, /\.onboarding-arrow\s*\{[^}]*left:\s*4\.5px/s);
+  assert.match(css, /\.onboarding-arrow\s*\{[^}]*width:\s*16px;\s*height:\s*10px/s);
+  assert.match(css, /\.onboarding-arrow\s*\{[^}]*background-size:\s*16px 10px/s);
   assert.doesNotMatch(css, /\.onboarding-arrow\s*\{[^}]*width:\s*24px/s);
+  const arrowRule = css.match(/\.onboarding-arrow\s*\{[^}]*\}/s)[0];
+  assert.doesNotMatch(arrowRule, /width%3D%271%27/,
+    "no 1px-wide outline runs in the caret sprite - the stroke stays 2px thick");
   assert.match(proofs, /onboardingArrowCompact/);
   assert.match(proofs, /onboardingArrowPointsAtMenu/);
   assert.match(proofs, /onboardingArrowInNativeShape/);
@@ -256,6 +264,12 @@ test("Rain and the playlist-style results scrollbar are release defaults", () =>
   assert.match(app, /visibleW \* RAIN_SCALE/);
   assert.match(app, /visibleH \* RAIN_SCALE/);
   assert.match(app, /if \(rain\) buildRain\(rainState\)/);
+  // The rain is the 1.5.1 original, restored verbatim at the owner's
+  // request: 6-logical-px cells, the original 5.6 cells/second pacing,
+  // and the 0.034/frame persistence fade. Do not "improve" it again.
+  assert.match(app, /cell = 6 \* RAIN_SCALE/);
+  assert.match(app, /GLYPHS\.speeds\[g\] \* 5\.6/);
+  assert.match(app, /rgba\(0,0,0,0\.034\)/);
   assert.doesNotMatch(app, /RAINW\s*=|RAINH\s*=/);
   assert.match(html, /id="mb-results-scroll"/);
   assert.match(app, /attachAmpScroll\(\$\("yt-results"\),\s*\$\("mb-results-scroll"\),\s*28\)/);
@@ -413,14 +427,18 @@ test("Windows taskbar icon has a real packaged path and upgrade-time pin repair"
     "allowToChangeInstallationDirectory kills upgrade-time shortcut keeping");
 });
 
-test("Setup.exe embeds the same filled brand icon as the desktop app", () => {
-  // The owner's final call: BOTH Windows executables carry the filled
-  // rounded plaque. With no installerIcon override, electron-builder
-  // compiles win.icon (claw-icon.ico) into Setup.exe as MUI_ICON, so the
-  // installer's file, window, and taskbar presence match the installed
-  // app. A transparent claw-mark.ico override must not come back.
+test("Setup.exe: filled FILE icon, transparent WINDOW art", () => {
+  // The owner's spec: Setup.exe's FILE icon (Explorer) is the same filled
+  // rounded plaque as the installed app - no installerIcon override, so
+  // electron-builder compiles win.icon into Setup.exe as MUI_ICON. The
+  // RUNNING Setup window is different: its titlebar, taskbar entry, and
+  // header show the transparent claw art, swapped in at GUI init with
+  // WM_SETICON so the compiled file icon stays untouched.
   assert.equal(pkg.build.nsis.installerIcon, undefined);
   assert.equal(pkg.build.win.icon, "assets/claw-icon.ico");
-  assert.equal(fs.existsSync(path.join(root, "assets", "claw-mark.ico")), false,
-    "the transparent installer ico was removed; only claw-icon.ico ships");
+  assert.equal(fs.existsSync(path.join(root, "assets", "claw-mark.ico")), true,
+    "assets/claw-mark.ico is the transparent runtime window art");
+  assert.match(installer, /MUI_CUSTOMFUNCTION_GUIINIT/);
+  assert.match(installer, /claw-mark\.ico/);
+  assert.match(installer, /SendMessage \$HWNDPARENT 0x0080/);
 });

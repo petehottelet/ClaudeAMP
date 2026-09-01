@@ -9,7 +9,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
-const { app, BrowserWindow, dialog, ipcMain, Menu, safeStorage, screen, shell, utilityProcess } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, Menu, powerSaveBlocker, safeStorage, screen, shell, utilityProcess } = require("electron");
 const { readyMarker, readyProbe, readyScreenReset, hasReadyMarker,
   stripReadyProbe } = require("./terminal-protocol.cjs");
 const { resolveLoginShell, loginShellArgs } = require("./terminal-platform.cjs");
@@ -176,6 +176,13 @@ function screenPointOverShape(px, py) {
 }
 function startMacHitTester() {
   if (process.platform !== "darwin" || macPoll) return;
+  // App Nap coalesces this poll's 6-16ms cadence into multi-second ticks
+  // once macOS decides the mostly-transparent overlay is idle/occluded.
+  // The first click after such a pause then found the window still
+  // ignoring the mouse and fell through to the app behind - which
+  // activated that app and made the nap deeper. The poll IS the app's
+  // input path, so suspension must stay off while it runs.
+  try { powerSaveBlocker.start("prevent-app-suspension"); } catch (_) {}
   let lastX = null, lastY = null;
   // CLAUDEAMP_HITTEST_TRACE=1 appends the poll's decisions to
   // userData/hittest.log - one failing click with this log shows whether
@@ -216,6 +223,12 @@ function startMacHitTester() {
     }
     macPoll = setTimeout(tick, cadence);
   };
+  // Any sign of life re-decides NOW instead of waiting out a timer the OS
+  // may have stretched: app activation and window focus both mean the user
+  // is (about to be) interacting.
+  const kick = () => { clearTimeout(macPoll); macPoll = setTimeout(tick, 0); };
+  app.on("activate", kick);
+  app.on("browser-window-focus", kick);
   macPoll = setTimeout(tick, macHittest.FAR_MS);
 }
 
@@ -402,6 +415,11 @@ function createWindow(port) {
       // user gesture, so the YouTube embed would start on launch. Match
       // browser behaviour: nothing plays until the user presses Play.
       autoplayPolicy: "document-user-activation-required",
+      // The transparent overlay reads as occluded to Chromium, which would
+      // throttle the renderer's shape re-report and forwarded-mousemove
+      // hit-test after idle - on macOS that turned into clicks falling
+      // through to the app behind once the user paused for a while.
+      backgroundThrottling: false,
     },
   });
   applyNativeMenu();

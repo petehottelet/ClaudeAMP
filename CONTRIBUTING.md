@@ -35,8 +35,9 @@ integration patterns in `test/` over source-grepping.
 
 ## Releasing
 
-Bump the version in `package.json`, `package-lock.json`, `js/version.js`,
-`assets/badges/version.svg`, and the README badge; move the `[Unreleased]`
+Bump the version in `package.json`, `package-lock.json`, and
+`js/version.js` (the README badges are live shields.io images and update
+themselves); move the `[Unreleased]`
 notes in `CHANGELOG.md` under the new version; then push a `v*` tag (or a
 `release/vX.Y.Z` branch — it publishes only if that version has no release
 yet). CI verifies on real macOS and Windows, builds all installers, creates

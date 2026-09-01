@@ -1857,7 +1857,6 @@
       document.head.appendChild(link);
       await loadScript("node_modules/@xterm/xterm/lib/xterm.js");
       await loadScript("node_modules/@xterm/addon-fit/lib/addon-fit.js");
-      await loadScript("node_modules/@xterm/addon-webgl/lib/addon-webgl.js");
       await loadScript("node_modules/@xterm/addon-canvas/lib/addon-canvas.js");
       await loadScript("node_modules/@xterm/addon-unicode11/lib/addon-unicode11.js");
     } catch (_) {
@@ -1895,19 +1894,14 @@
     // opening; opening xterm into a 0x0 box yields a black, zero-row panel.
     await waitForSize($("term-holder"));
     term.open($("term-holder"));
-    // GPU renderer with graceful degradation: webgl -> canvas -> DOM. The
-    // canvas fallback also covers GPU-less CI, so the fallback path is the
-    // one the verification suite actually exercises.
-    try {
-      const webgl = new window.WebglAddon.WebglAddon();
-      webgl.onContextLoss(() => {
-        try { webgl.dispose(); } catch (_) {}
-        try { term.loadAddon(new window.CanvasAddon.CanvasAddon()); } catch (_) {}
-      });
-      term.loadAddon(webgl);
-    } catch (_) {
-      try { term.loadAddon(new window.CanvasAddon.CanvasAddon()); } catch (_) {}
-    }
+    // Canvas renderer (accelerated 2D), DOM as the implicit fallback. NOT
+    // the WebGL addon: the desktop scales with the CSS `zoom` property, and
+    // under an ancestor zoom the WebGL renderer paints the grid into the
+    // bottom-left 1/zoom of its canvas (GL's origin is bottom-left), which
+    // left the top ~third of every zoomed terminal permanently black - the
+    // first-run default is 1.5x, so that was every Windows install. The
+    // canvas renderer sizes for the effective zoom and fills the panel.
+    try { term.loadAddon(new window.CanvasAddon.CanvasAddon()); } catch (_) {}
     try {
       term.loadAddon(new window.Unicode11Addon.Unicode11Addon());
       term.unicode.activeVersion = "11"; // wide glyphs and emoji keep columns aligned
@@ -3510,14 +3504,11 @@
     }
   }
   function buildRain(previous = null) {
-    // Guard here, not only in rainFx: drawFx's mode/size switch calls
-    // buildRain directly, and without glyph data a first-frame throw would
-    // kill the whole render loop, not just the rain.
-    if (typeof GLYPHS === "undefined") return;
+    if (typeof GLYPHS === "undefined") { rainState = null; return; } // glyph data missing: draw nothing
     // The backing follows the stage at exactly RAIN_SCALE on both axes. Cells
-    // therefore remain twelve logical pixels tall regardless of the window's
+    // therefore remain six logical pixels tall regardless of the window's
     // aspect ratio; a larger stage gets more backing pixels and more lanes.
-    const cell = 12 * RAIN_SCALE, pad = 6 * RAIN_SCALE;
+    const cell = 6 * RAIN_SCALE, pad = 3 * RAIN_SCALE;
     const W = fxCanvas.width, H = fxCanvas.height;
     const gw = cell * GLYPHS.canvas[0] / GLYPHS.canvas[1];
     const size = { w: Math.ceil(gw) + pad * 2, h: cell + pad * 2 };
@@ -3535,12 +3526,7 @@
         let c = document.createElement("canvas");
         c.width = size.w; c.height = size.h;
         let ctx = c.getContext("2d");
-        // Trail glyphs are solid character-green with their own soft glow -
-        // never a dark outline. The persistence fade supplies the gradient
-        // down the column; a fresh trail stamp starts at full brightness.
-        ctx.shadowColor = "rgba(0,255,0,.5)";
-        ctx.shadowBlur = cell * 0.25;
-        rainGlyphPath(ctx, g, pad, pad, cell, "#00FF00");
+        rainGlyphPath(ctx, g, pad, pad, cell, "rgb(0,150,0)");
         trail.push(c);
         c = document.createElement("canvas");
         c.width = size.w; c.height = size.h;
@@ -3569,67 +3555,40 @@
         glyph: g,
         phase: (Math.random() * count) | 0,
         y: ((Math.random() * 2.2 - 1.2) * H) | 0,
-        rate: GLYPHS.speeds[g] * 4.032, // cells/second: the original 5.6, tuned to taste
+        rate: GLYPHS.speeds[g] * 5.6, // cells/second, as in the original
         burst: 0,
         acc: Math.random(),
       });
     }
-    // The persistence surface holds ONLY trail stamps and their fade; the
-    // glowing heads are composited onto the visible canvas fresh each
-    // frame and never touch this surface. Kept across rebuilds when the
-    // stage size is unchanged so running trails survive.
-    let surface = previous?.surface;
-    if (!surface || surface.width !== W || surface.height !== H) {
-      surface = document.createElement("canvas");
-      surface.width = W; surface.height = H;
-    }
-    rainState = { trail, head, pad, stepY, columns, count, W, H,
-      surface, surfaceCtx: surface.getContext("2d") };
+    rainState = { trail, head, pad, stepY, columns, count, W, H };
   }
   function rainFx(energy) {
     if (typeof GLYPHS === "undefined") return; // glyph data missing: draw nothing
     if (!rainState) buildRain();
-    const { trail, head, pad, stepY, columns, count, W, H, surface, surfaceCtx } = rainState;
-    // Real elapsed time, like snakeGame: a fixed 1/60 step under
-    // requestAnimationFrame ran the rain at double speed (and halved the
-    // trail persistence) on 120 Hz displays. Capped so a background tab
-    // doesn't fast-forward on return.
-    const now = performance.now();
-    const dt = Math.min(0.05, (now - (rainState.clock || now)) / 1000);
-    rainState.clock = now;
-    // Persistence: trail stamps dim slowly on the offscreen surface. Heads
-    // are drawn onto the VISIBLE canvas every frame (constant glow, thick,
-    // smooth) but never onto the surface - so their glow cannot accumulate
-    // into a saturated blob that a later, darker trail stamp would read as
-    // a black character knocked out of green. The fade scales with dt so
-    // trails persist the same wall-clock time at any refresh rate.
-    surfaceCtx.fillStyle = "rgba(0,0,0," + (1 - Math.pow(0.966, dt * 60)).toFixed(4) + ")";
-    surfaceCtx.fillRect(0, 0, W, H);
-    surfaceCtx.globalAlpha = 1;
+    if (!rainState) return;
+    const { trail, head, pad, stepY, columns, count, W, H } = rainState;
+    // persistence: last frame's heads dim slowly into long trails (full canvas)
+    fxCtx.fillStyle = "rgba(0,0,0,0.034)";
+    fxCtx.fillRect(0, 0, W, H);
+    const dt = 1 / 60;
     const pace = 1 + energy * 0.25; // original speed, swaying a touch with the music
     for (const col of columns) {
       col.acc += dt * col.rate * (col.burst > 0 ? 1.9 : 1) * pace;
       if (col.burst > 0) col.burst -= dt;
       while (col.acc >= 1) {
         col.acc -= 1;
-        surfaceCtx.drawImage(trail[(col.glyph + col.phase) % count], col.x - pad, col.y - pad);
+        fxCtx.globalAlpha = 1;
+        fxCtx.drawImage(trail[(col.glyph + col.phase) % count], col.x - pad, col.y - pad);
         col.y += stepY;
         col.phase = (col.phase + 7) % count;
         const past = col.y - GLYPHS.trails[col.glyph] * stepY * 1.15;
         if (past > H && Math.random() < 0.6) {
           col.y = -stepY * ((Math.random() * 7) | 0);
           col.glyph = (Math.random() * count) | 0;
-          col.rate = GLYPHS.speeds[col.glyph] * 4.032;
+          col.rate = GLYPHS.speeds[col.glyph] * 5.6;
           if (Math.random() < 0.06) col.burst = 1.6;
         }
       }
-    }
-    // composite: faded trails below, live glowing heads above
-    fxCtx.globalCompositeOperation = "copy";
-    fxCtx.globalAlpha = 1;
-    fxCtx.drawImage(surface, 0, 0);
-    fxCtx.globalCompositeOperation = "source-over";
-    for (const col of columns) {
       if (col.y > -stepY && col.y < H + stepY) {
         fxCtx.globalAlpha = col.burst > 0 ? 1 : 0.92;
         fxCtx.drawImage(head[(col.glyph + col.phase) % count], col.x - pad, col.y - pad);

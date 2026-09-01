@@ -66,3 +66,20 @@ test("the halo grows with cursor speed and stays within its bounds", () => {
   assert.strictEqual(armMargin(NaN), ENTER_MARGIN);
   assert.strictEqual(armMargin(undefined), ENTER_MARGIN);
 });
+
+test("the poll is protected from App Nap and renderer throttling", () => {
+  // macOS coalesced the 6-16ms cursor poll into multi-second ticks once it
+  // judged the transparent overlay idle/occluded; the first click after a
+  // pause then fell through to the app behind. The poll IS the input path,
+  // so suspension stays off at all three layers.
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const main = fs.readFileSync(path.join(__dirname, "..", "electron", "main.cjs"), "utf8");
+  const pkg = require("../package.json");
+  assert.match(main, /powerSaveBlocker\.start\("prevent-app-suspension"\)/);
+  assert.match(main, /backgroundThrottling:\s*false/);
+  assert.strictEqual(pkg.build.mac.extendInfo.NSAppSleepDisabled, true);
+  // any wake re-decides immediately instead of waiting out a stretched timer
+  assert.match(main, /app\.on\("activate", kick\)/);
+  assert.match(main, /app\.on\("browser-window-focus", kick\)/);
+});
