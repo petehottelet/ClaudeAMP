@@ -99,6 +99,7 @@
     },
     "nsis": {
       "oneClick": false,
+      "deleteAppDataOnUninstall": true,
       "installerIcon": "assets/claw-mark.ico",
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,

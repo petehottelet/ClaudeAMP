@@ -1989,7 +1989,11 @@
      The modern panel (same design language as Settings, liquid glass on
      macOS): pick terminal vs chat, pick where the music plays from, go.
      Choices are remembered; reopening it later preselects the live state. */
-  const SETUP_KEY = "claudeamp.onboarding.setup.v1";
+  // v2: shown once to everyone at the 1.7 re-founding - installs before
+  // 1.7.1 kept their app data across uninstall/reinstall (the Windows
+  // uninstaller now clears it, but only uninstallers built from 1.7.1 on),
+  // so the key bump is what actually re-runs the welcome for them.
+  const SETUP_KEY = "claudeamp.onboarding.setup.v2";
   let setupWired = false;
   let wmPage = 1;
 
@@ -2124,7 +2128,12 @@
     }
     if (!setupWired) {
       setupWired = true;
-      $("wm-close").addEventListener("click", () => { overlay.hidden = true; });
+      $("wm-close").addEventListener("click", () => {
+        overlay.hidden = true;
+        // Closing counts as seen - the welcome must not nag every boot;
+        // it stays reachable from the menu.
+        store.setRaw(SETUP_KEY, "done");
+      });
       $("wm-start").addEventListener("click", () => {
         if (wmPage === 1 && wmNeedsPage2()) { wmShowPage(2); return; }
         wmFinish();

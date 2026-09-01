@@ -7,6 +7,15 @@ the `package.json` version, which CI requires to agree with `js/version.js`.
 ## [1.7.1] - 2026-09-01
 
 ### Fixed
+- The welcome screen runs again on a true first run after reinstalling:
+  the Windows uninstaller now clears the app's data on a real uninstall
+  (upgrades keep everything), and everyone sees the welcome once at the
+  1.7 re-founding since older uninstallers left the previous data
+  behind. Closing the welcome counts as seen - it never nags every
+  boot, and stays reachable from the menu.
+- The search button's magnifying glass is drawn and shown at native
+  pixel size (a 7px ring with a two-pixel stepped handle). The old icon
+  squeezed an 11px pixel grid into a 9px box, which smudged it.
 - The rain screensaver's glow, thickness, and smooth motion are back.
   The 1.6.6 fix for black reversed-out characters stopped re-stamping
   the glowing heads each frame, which also dimmed and roughened them.
