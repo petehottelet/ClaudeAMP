@@ -2,8 +2,7 @@
   <p><img src="docs/claudeamp-logo.png" alt="ClaudeAmp desktop AI terminal for Claude Code, OpenAI Codex, and Ollama" width="720"></p>
 
   <p>
-    <strong>A classically-styled terminal interface for Claude Code, OpenAI Codex, and Ollama.</strong><br>
-    For Windows, macOS, and Linux.
+    <strong>A classically-styled terminal interface for Claude Code, OpenAI Codex, and Ollama.</strong>
   </p>
 
   <p>
