@@ -39,7 +39,7 @@ jobs:
     outputs:
       publish: ${{ steps.decide.outputs.publish }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Decide publish mode and pre-create the release
         id: decide
         env:
@@ -84,7 +84,7 @@ jobs:
               xvfb-run -a node scripts/verify-packaged.cjs dist/linux-unpacked/claudeamp --no-sandbox
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -128,7 +128,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/') || inputs.publish == 'yes' || startsWith(github.ref, 'refs/heads/release/')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Compute and attach SHA256SUMS.txt
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -169,7 +169,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/') || inputs.publish == 'yes' || startsWith(github.ref, 'refs/heads/release/')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Require installers and verify checksums
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
