@@ -389,12 +389,12 @@ async function runVerifyProof(window) {
     for (let i = 0; i < 40; i++) {
       await wait(500);
       const state = await window.webContents.executeJavaScript(`(() => {
-        const rows = document.querySelector('#term-holder .xterm-rows');
+        const probe = window.__claudeampTermText ? window.__claudeampTermText() : { rows: [] };
         const note = document.getElementById('term-note');
         const noteStyle = note ? getComputedStyle(note) : null;
         const noteVisible = !!note && noteStyle.display !== 'none' &&
           noteStyle.visibility !== 'hidden' && Number(noteStyle.opacity || 1) > 0;
-        return { rows: rows ? rows.textContent : '',
+        return { rows: probe.rows.join('\\n'),
                  note: noteVisible ? note.textContent : '', noteVisible,
                  backend: document.getElementById('term-holder')?.dataset.backend || '' };
       })()`).catch(() => ({ rows: "", note: "" }));
@@ -454,10 +454,8 @@ async function runVerifyProof(window) {
       let consoleText = "";
       for (let i = 0; i < 30; i++) {
         await wait(250);
-        consoleText = await window.webContents.executeJavaScript(`(() => {
-          const rows = document.querySelector('#term-holder .xterm-rows');
-          return rows ? rows.textContent : '';
-        })()`).catch(() => "");
+        consoleText = await window.webContents.executeJavaScript(
+          `(window.__claudeampTermText ? window.__claudeampTermText().rows.join('\\n') : '')`).catch(() => "");
         if (/Status for device CON|Lines:\s*\d+/i.test(String(consoleText))) break;
       }
       check("terminalHasConsoleDevice", /Status for device CON|Lines:\s*\d+/i.test(String(consoleText)),
@@ -475,10 +473,8 @@ async function runVerifyProof(window) {
     let interactiveText = "";
     for (let i = 0; i < 30; i++) {
       await wait(250);
-      interactiveText = await window.webContents.executeJavaScript(`(() => {
-        const rows = document.querySelector('#term-holder .xterm-rows');
-        return rows ? rows.textContent : '';
-      })()`).catch(() => "");
+      interactiveText = await window.webContents.executeJavaScript(
+        `(window.__claudeampTermText ? window.__claudeampTermText().rows.join('\\n') : '')`).catch(() => "");
       if (String(interactiveText).includes(uiMarker)) break;
     }
     check("terminalAcceptsInput", String(interactiveText).includes(uiMarker),
@@ -498,10 +494,8 @@ async function runVerifyProof(window) {
       let claudeText = "";
       for (let i = 0; i < 40; i++) {
         await wait(500);
-        claudeText = await window.webContents.executeJavaScript(`(() => {
-          const rows = document.querySelector('#term-holder .xterm-rows');
-          return rows ? rows.textContent : '';
-        })()`).catch(() => "");
+        claudeText = await window.webContents.executeJavaScript(
+          `(window.__claudeampTermText ? window.__claudeampTermText().rows.join('\\n') : '')`).catch(() => "");
         if (/Claude Code|Welcome back|Recent activity|Tips for getting started|Not logged in/i.test(String(claudeText))) break;
       }
       check("claudeCliRendersTui",
@@ -529,7 +523,10 @@ async function runVerifyProof(window) {
         const settings = JSON.parse(localStorage.getItem('claudeamp.settings') || '{}');
         settings.chatMode = 'chat'; settings.zoom = 1; settings.zoomV5 = true;
         localStorage.setItem('claudeamp.settings', JSON.stringify(settings));
-        localStorage.setItem('claudeamp.onboarding.setup.v1', 'done');
+        // The CURRENT setup key (bumped to v2 at the 1.7 re-founding): an
+        // unset key makes the reloaded app open the welcome instead of the
+        // restored terminal, which is exactly what this proof must not race.
+        localStorage.setItem('claudeamp.onboarding.setup.v2', 'done');
         // This reload specifically verifies restored terminal geometry. Keep
         // the separate menu-tip onboarding from moving only one dock group.
         localStorage.setItem('claudeamp.onboarding.menu.v2', 'done');
@@ -566,13 +563,11 @@ async function runVerifyProof(window) {
         const terminalHolder = document.getElementById('term-holder');
         const xterm = document.querySelector('#term-holder .xterm');
         const screen = document.querySelector('#term-holder .xterm-screen');
-        const rows = document.querySelector('#term-holder .xterm-rows');
+        const probe = window.__claudeampTermText ? window.__claudeampTermText() : { rows: [], cursorRow: -1 };
         const note = document.getElementById('term-note');
         const noteStyle = note ? getComputedStyle(note) : null;
-        const rowElements = rows ? Array.from(rows.children) : [];
-        const rowTexts = rowElements.map(row => row.textContent || '');
-        const cursor = document.querySelector('#term-holder .xterm-cursor');
-        const cursorRow = cursor ? rowElements.findIndex(row => row.contains(cursor)) : -1;
+        const rowTexts = probe.rows;
+        const cursorRow = probe.cursorRow;
         let promptRow = -1;
         rowTexts.forEach((text, index) => { if (/[A-Za-z]:\\\\.*>\\s*$/.test(text)) promptRow = index; });
         return {
@@ -580,7 +575,7 @@ async function runVerifyProof(window) {
           terminalTop: terminalWindow?.getBoundingClientRect().top ?? null,
           mainTop: mainWindow?.getBoundingClientRect().top ?? null,
           xtermPresent: !!xterm,
-          rows: rows ? rows.textContent : '',
+          rows: rowTexts.join('\\n'),
           noteVisible: !!noteStyle && noteStyle.display !== 'none' && noteStyle.visibility !== 'hidden',
           note: note ? note.textContent : '',
           fontFamily: screen ? getComputedStyle(screen).fontFamily : '',
@@ -620,10 +615,8 @@ async function runVerifyProof(window) {
     let restoredInteractive = "";
     for (let i = 0; i < 30; i++) {
       await wait(250);
-      restoredInteractive = await window.webContents.executeJavaScript(`(() => {
-        const rows = document.querySelector('#term-holder .xterm-rows');
-        return rows ? rows.textContent : '';
-      })()`).catch(() => "");
+      restoredInteractive = await window.webContents.executeJavaScript(
+        `(window.__claudeampTermText ? window.__claudeampTermText().rows.join('\\n') : '')`).catch(() => "");
       if (String(restoredInteractive).includes(restoredMarker)) break;
     }
     check("restoredTerminalAcceptsInput", String(restoredInteractive).includes(restoredMarker),

@@ -547,6 +547,9 @@ ipcMain.handle("claudeamp:term-open", async (event, size) => {
     const locale = String(app.getLocale() || "").replace(/-/g, "_");
     ptyEnv.LANG = (/^[a-z]{2,3}_[A-Z]{2}$/.test(locale) ? locale : "en_US") + ".UTF-8";
   }
+  // Without COLORTERM, truecolor TUIs (Claude Code's orange included)
+  // quantize to the 256-color palette. xterm.js renders 24-bit color fine.
+  if (!ptyEnv.COLORTERM) ptyEnv.COLORTERM = "truecolor";
   const spawnOptions = {
     name: "xterm-256color",
     cols: Math.max(20, Math.min(500, Number(size?.cols) || 80)),

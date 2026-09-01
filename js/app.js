@@ -1777,25 +1777,30 @@
       document.head.appendChild(link);
       await loadScript("node_modules/@xterm/xterm/lib/xterm.js");
       await loadScript("node_modules/@xterm/addon-fit/lib/addon-fit.js");
+      await loadScript("node_modules/@xterm/addon-webgl/lib/addon-webgl.js");
+      await loadScript("node_modules/@xterm/addon-canvas/lib/addon-canvas.js");
+      await loadScript("node_modules/@xterm/addon-unicode11/lib/addon-unicode11.js");
     } catch (_) {
       termFailed = true;
       termNote("TERMINAL ASSETS MISSING - RUN NPM INSTALL AND RESTART");
       return false;
     }
     try {
-    // macOS ships neither Lucida Console nor Cascadia Mono, so the stack
-    // used to land on Courier New - whose Unicode block-element coverage is
-    // poor enough to garble the Claude CLI's block-art banner. Menlo (the
-    // classic Terminal.app face) renders block and box-drawing glyphs
-    // correctly and keeps the same feel.
-    const terminalFont = window.claudeampNative?.platform === "darwin"
-      ? '"Menlo", "Monaco", monospace'
-      : '"Lucida Console", "Courier New", "Cascadia Mono", monospace';
+    // One stack for every platform: Lucida Console first (the blocky
+    // classic-Windows face; absent on macOS), then Menlo - which every Mac
+    // ships with full Block Elements coverage, so the Claude CLI's block-art
+    // banner renders whole instead of falling through to Courier New.
+    const terminalFont = '"Lucida Console", "Menlo", "Cascadia Mono", "Courier New", monospace';
     term = new window.Terminal({
-      // Lucida Console is the blockier classic-Windows face; Courier New and
-      // Cascadia Mono keep the terminal readable if it is unavailable.
       fontFamily: terminalFont,
-      fontSize: 13,
+      // 12px keeps the cell height an integer at every zoom step
+      // (12/18/24/30/36); 13px at 1.5x zoom was 19.5 device pixels, and the
+      // fractional rows drew hairline seams through block art.
+      fontSize: 12,
+      // xterm draws U+2500-U+259F (box drawing + block elements) itself,
+      // cell-exact, instead of trusting the font - the other half of the
+      // garbled-mascot fix. Takes effect with the webgl/canvas renderer.
+      customGlyphs: true,
       cursorBlink: true,
       theme: {
         background: "#000000", foreground: "#00FF00",
@@ -1810,6 +1815,37 @@
     // opening; opening xterm into a 0x0 box yields a black, zero-row panel.
     await waitForSize($("term-holder"));
     term.open($("term-holder"));
+    // GPU renderer with graceful degradation: webgl -> canvas -> DOM. The
+    // canvas fallback also covers GPU-less CI, so the fallback path is the
+    // one the verification suite actually exercises.
+    try {
+      const webgl = new window.WebglAddon.WebglAddon();
+      webgl.onContextLoss(() => {
+        try { webgl.dispose(); } catch (_) {}
+        try { term.loadAddon(new window.CanvasAddon.CanvasAddon()); } catch (_) {}
+      });
+      term.loadAddon(webgl);
+    } catch (_) {
+      try { term.loadAddon(new window.CanvasAddon.CanvasAddon()); } catch (_) {}
+    }
+    try {
+      term.loadAddon(new window.Unicode11Addon.Unicode11Addon());
+      term.unicode.activeVersion = "11"; // wide glyphs and emoji keep columns aligned
+    } catch (_) {}
+    // The GPU renderer keeps screen text out of the DOM (.xterm-rows stays
+    // empty), so the verification harness reads the terminal through this
+    // buffer probe instead.
+    window.__claudeampTermText = () => {
+      try {
+        const buf = term.buffer.active;
+        const rows = [];
+        for (let i = 0; i < term.rows; i++) {
+          const line = buf.getLine(buf.viewportY + i);
+          rows.push(line ? line.translateToString(true) : "");
+        }
+        return { rows, cursorRow: buf.cursorY };
+      } catch (_) { return { rows: [], cursorRow: -1 }; }
+    };
     const xtermRoot = $("term-holder").querySelector(".xterm");
     if (xtermRoot) xtermRoot.style.fontFamily = terminalFont;
     const terminalViewport = $("term-holder").querySelector(".xterm-viewport");
@@ -2133,6 +2169,11 @@
         // Closing counts as seen - the welcome must not nag every boot;
         // it stays reachable from the menu.
         store.setRaw(SETUP_KEY, "done");
+        // A returning shell-mode user dismissing the re-shown welcome still
+        // gets their terminal: the boot path skipped its shell startup
+        // because the welcome intercepted it.
+        if (S.chatMode === "shell" && window.claudeampTerm && !WM.visible("win-term"))
+          setChatMode("shell");
       });
       $("wm-start").addEventListener("click", () => {
         if (wmPage === 1 && wmNeedsPage2()) { wmShowPage(2); return; }
@@ -3401,7 +3442,12 @@
         let c = document.createElement("canvas");
         c.width = size.w; c.height = size.h;
         let ctx = c.getContext("2d");
-        rainGlyphPath(ctx, g, pad, pad, cell, "rgb(0,150,0)");
+        // Trail glyphs are solid character-green with their own soft glow -
+        // never a dark outline. The persistence fade supplies the gradient
+        // down the column; a fresh trail stamp starts at full brightness.
+        ctx.shadowColor = "rgba(0,255,0,.5)";
+        ctx.shadowBlur = cell * 0.25;
+        rainGlyphPath(ctx, g, pad, pad, cell, "#00FF00");
         trail.push(c);
         c = document.createElement("canvas");
         c.width = size.w; c.height = size.h;

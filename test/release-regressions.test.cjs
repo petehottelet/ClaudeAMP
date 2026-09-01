@@ -93,7 +93,16 @@ test("real terminal remains packaged, reachable, and covered by verification", (
   assert.match(main, /readiness round trip complete/);
   assert.match(app, /res\.initialData/);
   assert.match(app, /WM\.visible\("win-term"\)[\s\S]*openTerminal\(shellAutoCommand\(\)\)/);
-  assert.match(app, /"Lucida Console", "Courier New", "Cascadia Mono"/);
+  assert.match(app, /"Lucida Console", "Menlo", "Cascadia Mono", "Courier New"/);
+  // Block art renders cell-exact regardless of font, at integer cell
+  // heights, through the GPU renderer with a canvas fallback; truecolor
+  // TUIs get their real colors.
+  assert.match(app, /customGlyphs:\s*true/);
+  assert.match(app, /fontSize:\s*12\b/);
+  assert.match(app, /addon-webgl\/lib\/addon-webgl\.js/);
+  assert.match(app, /CanvasAddon\.CanvasAddon\(\)/);
+  assert.match(app, /Unicode11Addon\(\)/);
+  assert.match(main, /COLORTERM\s*=\s*"truecolor"/);
   assert.match(html, /id="term-scroll"[\s\S]*class="amp-scroll-track"/);
   assert.match(app, /attachAmpScroll\(terminalViewport,\s*\$\("term-scroll"\)/);
   assert.match(app, /setChatMode\(WM\.visible\("win-term"\) \? "chat" : "shell"\)/);
