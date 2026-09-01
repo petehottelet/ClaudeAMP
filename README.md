@@ -7,7 +7,7 @@
   </p>
 
   <p>
-    <img src="assets/badges/version.svg" alt="Version 1.7.1">
+    <img src="assets/badges/version.svg" alt="Version 1.7.2">
     <img src="assets/badges/verify.svg" alt="Local verification passed">
     <img src="assets/badges/platforms.svg" alt="Desktop: Windows, macOS, and Linux">
     <a href="LICENSE"><img src="assets/badges/license.svg" alt="License: MIT"></a>
@@ -112,7 +112,7 @@ can run anything there — including `claude` itself. Pick **Mode: Real
 Terminal** in the menu (or in the setup wizard) and the shell replaces the
 chat window outright, auto-launching the CLI for your selected provider.
 
-Tagged releases (`git tag v1.7.1 && git push origin v1.7.1`) build the installers
+Tagged releases (`git tag v1.7.2 && git push origin v1.7.2`) build the installers
 automatically via GitHub Actions and attach them to the GitHub release, so
 users pick `ClaudeAmp-Setup-<version>.exe` or `ClaudeAmp-<version>-<arch>.dmg`
 from the same Releases page.

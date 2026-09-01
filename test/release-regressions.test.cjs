@@ -25,7 +25,7 @@ const radio = read("js/radio.js");
 
 test("release version agrees across package, lockfile, and UI", () => {
   const uiVersion = versionSource.match(/CLAUDEAMP_VERSION\s*=\s*"([^"]+)"/)?.[1];
-  assert.equal(pkg.version, "1.7.1");
+  assert.equal(pkg.version, "1.7.2");
   assert.equal(lock.version, pkg.version);
   assert.equal(lock.packages[""].version, pkg.version);
   assert.equal(uiVersion, pkg.version);
@@ -394,27 +394,14 @@ test("Windows taskbar icon has a real packaged path and upgrade-time pin repair"
   assert.match(installer, /ie4uinit\.exe[\s\S]*-show/);
 });
 
-test("installer UI shows the transparent mark, not the solid app icon", () => {
-  // MUI_ICON is the one icon compiled into Setup.exe: it is the window's
-  // top-left icon and every in-install context icon. Those must show the
-  // transparent claw-diamond art (as v1.5 did), while the app executable
-  // and shortcuts keep the solid rounded brand icon.
-  assert.equal(pkg.build.nsis.installerIcon, "assets/claw-mark.ico");
-  const ico = fs.readFileSync(path.join(root, "assets", "claw-mark.ico"));
-  const count = ico.readUInt16LE(4);
-  let largest = null;
-  for (let index = 0; index < count; index++) {
-    const entry = 6 + index * 16;
-    const width = ico[entry] || 256;
-    const size = ico.readUInt32LE(entry + 8);
-    const offset = ico.readUInt32LE(entry + 12);
-    if (!largest || width > largest.width) largest = { width, size, offset };
-  }
-  assert.equal(largest.width, 256);
-  const png = decodeRgbaPng(ico.subarray(largest.offset, largest.offset + largest.size));
-  assert.equal(png.pixel(0, 0)[3], 0, "corner must be transparent");
-  assert.equal(png.pixel(60, 4)[3], 0,
-    "area outside the diamond must be transparent - a gradient fill here means the solid icon leaked in");
-  assert.equal(png.pixel(128, 8)[3], 255, "diamond outline must be opaque");
-  assert.equal(png.pixel(128, 128)[3], 255, "claw art must be opaque");
+test("Setup.exe embeds the same filled brand icon as the desktop app", () => {
+  // The owner's final call: BOTH Windows executables carry the filled
+  // rounded plaque. With no installerIcon override, electron-builder
+  // compiles win.icon (claw-icon.ico) into Setup.exe as MUI_ICON, so the
+  // installer's file, window, and taskbar presence match the installed
+  // app. A transparent claw-mark.ico override must not come back.
+  assert.equal(pkg.build.nsis.installerIcon, undefined);
+  assert.equal(pkg.build.win.icon, "assets/claw-icon.ico");
+  assert.equal(fs.existsSync(path.join(root, "assets", "claw-mark.ico")), false,
+    "the transparent installer ico was removed; only claw-icon.ico ships");
 });

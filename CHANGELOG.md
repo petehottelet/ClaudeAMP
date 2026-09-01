@@ -4,6 +4,30 @@ Notable changes to ClaudeAmp. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 the `package.json` version, which CI requires to agree with `js/version.js`.
 
+## [1.7.2] - 2026-09-01
+
+### Fixed
+- Windows: the Setup executable embeds the same filled rounded brand
+  icon as the installed app, so the installer's file, window, and
+  taskbar presence all match. (The transparent installer icon from
+  1.6.4 is gone.)
+- Terminal: block art (the Claude Code mascot included) renders
+  cell-exact on every platform - GPU renderer with a canvas fallback
+  and xterm's own box/block glyphs, integer cell heights at every zoom
+  step, one font stack with Menlo covering macOS, truecolor for TUIs,
+  and Unicode 11 widths so columns stay aligned.
+- The rain's trail characters are solid glowing character-green, not
+  dark outlines.
+- The first-run tooltip's caret is clean stepped pixel art with a tight
+  outline - no stray black pixels under the tip.
+- A returning Terminal-mode user who dismisses the re-shown welcome
+  with its close button still gets their terminal opened.
+
+### Added
+- The claudeamp.com landing page lives in `site/` (Vercel serves it via
+  `vercel.json`): the wide logo and interface screenshot above the
+  fold, the app's own palette, and download links.
+
 ## [1.7.1] - 2026-09-01
 
 ### Fixed
