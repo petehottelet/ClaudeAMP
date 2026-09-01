@@ -7,7 +7,7 @@
 
   <p>
     <a href="https://github.com/petehottelet/claudeamp/releases/latest"><img src="assets/badges/version.svg" alt="ClaudeAmp version 1.7.1"></a>
-    <img src="assets/badges/verify.svg" alt="Local verification passed">
+    <a href="https://github.com/petehottelet/claudeamp/actions/workflows/verify.yml"><img src="https://github.com/petehottelet/claudeamp/actions/workflows/verify.yml/badge.svg?branch=main" alt="ClaudeAmp verification status"></a>
     <img src="assets/badges/platforms.svg" alt="Desktop: Windows, macOS, and Linux">
     <a href="LICENSE"><img src="assets/badges/license.svg" alt="License: MIT"></a>
   </p>

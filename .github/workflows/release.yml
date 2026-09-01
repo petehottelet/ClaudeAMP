@@ -48,12 +48,15 @@ jobs:
         run: |
           mode=never
           if [ "$ELIGIBLE" = "true" ]; then
-            tag="v$(node -p "require('./package.json').version")"
+            version="$(node -p "require('./package.json').version")"
+            tag="v$version"
             if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
               echo "release $tag already exists - builds will be dry runs"
             else
+              node scripts/release-notes.cjs "$version" > /tmp/claudeamp-release-notes.md
               gh release create "$tag" --repo "$GITHUB_REPOSITORY" \
-                --target "$GITHUB_SHA" --title "${tag#v}" --notes "ClaudeAmp ${tag#v}"
+                --target "$GITHUB_SHA" --title "$version" \
+                --notes-file /tmp/claudeamp-release-notes.md
               mode=always
             fi
           fi
