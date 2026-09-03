@@ -35,9 +35,9 @@ const Music = (() => {
     applePreview(190809033,  "Alice In Chains - Rooster"),
     applePreview(989445780,  "Letters To Cleo - Here & Now"),
     applePreview(291497568,  "Face To Face - Disconnected"),
-    applePreview(724739482,  "Katrina & The Waves - Walking On Sunshine"),
-    applePreview(358058316,  "Belly - Feed The Tree"),
     applePreview(1667655088, "The Lemonheads - It's A Shame About Ray"),
+    applePreview(358058316,  "Belly - Feed The Tree"),
+    applePreview(724739482,  "Katrina & The Waves - Walking On Sunshine"),
     applePreview(444190188,  "Sebadoh - Skull"),
     applePreview(1251496094, "The Breeders - Cannonball"),
     applePreview(40454935,   "Spacehog - In The Meantime"),
@@ -147,6 +147,18 @@ const Music = (() => {
   const replaceBosstones = list => (list || []).map(track =>
     /mighty mighty bosstones/i.test(String(track && track.title || ""))
       ? normalizeTrack({ ...BOSSTONES_REPLACEMENT }) : track);
+  // The bundled catalog's ORDER changes between releases (the owner
+  // reshuffles it). save() stamps every playlist custom:true, so a stored
+  // playlist that is still exactly the bundled catalog - the same Apple
+  // ids, in any order - follows the current order here, keeping each
+  // track's stored fields. Anything the user added or removed is left alone.
+  const DEFAULT_IDS = DEFAULT_TRACKS.map(track => String(track.id));
+  const followDefaultOrder = list => {
+    if (!Array.isArray(list) || list.length !== DEFAULT_IDS.length) return list;
+    const byId = new Map(list.map(track => [String(track && track.id), track]));
+    if (byId.size !== DEFAULT_IDS.length || !DEFAULT_IDS.every(id => byId.has(id))) return list;
+    return DEFAULT_IDS.map(id => byId.get(id));
+  };
   function current() { return tracks[idx] || null; }
 
   function save() {
@@ -170,7 +182,7 @@ const Music = (() => {
         for (const playlist of Object.values(savedPlaylists)) {
           if (!playlist || !Array.isArray(playlist.tracks)) continue;
           const before = JSON.stringify(playlist.tracks);
-          playlist.tracks = replaceBosstones(playlist.tracks);
+          playlist.tracks = followDefaultOrder(replaceBosstones(playlist.tracks));
           if (JSON.stringify(playlist.tracks) !== before) libraryChanged = true;
         }
         if (libraryChanged) saveLibrary();
@@ -179,7 +191,12 @@ const Music = (() => {
     try {
       const data = JSON.parse(localStorage.getItem(ACTIVE_KEY) || "null");
       if (data && Array.isArray(data.tracks) && (data.custom || data.v === TRACKS_V)) {
-        const storedTracks = replaceBosstones(cloneTracks(data.tracks));
+        const migrated = replaceBosstones(cloneTracks(data.tracks));
+        const storedTracks = followDefaultOrder(migrated);
+        // A reorder must not change which song is current.
+        const playing = migrated[Math.max(0, data.idx || 0)];
+        if (storedTracks !== migrated && playing)
+          data.idx = Math.max(0, storedTracks.findIndex(track => track === playing));
         if (looksLikeLegacyDefault(data, storedTracks)) {
           tracks = DEFAULT_TRACKS.map(track => normalizeTrack({ ...track }));
           idx = Math.min(Math.max(0, data.idx || 0), tracks.length - 1);
