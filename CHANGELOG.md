@@ -4,14 +4,6 @@ Notable changes to ClaudeAmp. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 the `package.json` version, which CI requires to agree with `js/version.js`.
 
-## [Unreleased]
-
-### Changed
-- Default playlist: tracks 22 and 24 swapped (The Lemonheads now at 22,
-  Katrina & The Waves at 24). An existing playlist that is still exactly
-  the bundled catalog follows the new order on next launch; edited
-  playlists are untouched.
-
 ## [1.7.5] - 2026-09-03
 
 ### Fixed
@@ -31,6 +23,10 @@ the `package.json` version, which CI requires to agree with `js/version.js`.
   the welcome still runs on first launch, and Settings carries everything
   it sets.
 - Rain glyphs are 1.5x larger.
+- Default playlist: tracks 22 and 24 swapped (The Lemonheads now at 22,
+  Katrina & The Waves at 24). An existing playlist that is still exactly
+  the bundled catalog follows the new order on next launch; edited
+  playlists are untouched.
 
 ## [1.7.4] - 2026-09-03
 
