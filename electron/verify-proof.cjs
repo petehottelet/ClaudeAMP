@@ -416,10 +416,24 @@ async function runVerifyProof(window) {
         const r = document.getElementById('eq-on').getBoundingClientRect();
         return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
       })()`);
+      // Let every synthetic move be processed before the next is sent:
+      // Chromium coalesces back-to-back mouse moves into the last one, and
+      // the renderer only reports CHANGES - a swallowed reset move leaves
+      // its cache stale and the next move silent.
       const moveTo = async (point, wantIgnoring) => {
         window.webContents.sendInputEvent({ type: "mouseMove", x: point.x, y: point.y });
+        await wait(80);
         for (let i = 0; i < 20 && ctx.macIgnoring !== wantIgnoring; i++) await wait(25);
         return ctx.macIgnoring;
+      };
+      // A point outside every CURRENT shape rect (no halo: the renderer
+      // hit-test has none), on a fine grid so small displays still have one.
+      const findGap = (margin = 0) => {
+        for (let gx = 0; gx < bounds.width; gx += 20)
+          for (let gy = 0; gy < bounds.height; gy += 20)
+            if (!ctx.screenShapeDecision(bounds.x + gx, bounds.y + gy, margin).near)
+              return { x: gx, y: gy };
+        return null;
       };
       ctx.setMacState({ rendererOver: false, pollOver: false, held: false });
       if (gapPoint) {
@@ -449,21 +463,28 @@ async function runVerifyProof(window) {
       const popupPoint = menu ? { x: menu.x + 8, y: menu.bottom - 6 } : null;
       check("macPopupInNativeShape", menuCovered && !!popupPoint &&
         ctx.screenPointOverShape(bounds.x + popupPoint.x, bounds.y + popupPoint.y), { menu, menuCovered });
-      if (popupPoint && gapPoint) {
+      // The reset gap must come from the shape WITH the popup in it: on the
+      // hosted runner the menu opened over the earlier gap point, so the
+      // "gap" move landed inside the popup and the renderer's change-only
+      // cache never flipped.
+      const popupGap = findGap(0);
+      if (popupPoint && popupGap) {
         ctx.setMacState({ rendererOver: false, pollOver: false, held: false });
-        await moveTo(gapPoint, true);
-        check("macPopupRendererArms", (await moveTo(popupPoint, false)) === false);
+        await moveTo(popupGap, true);
+        check("macPopupRendererArms", (await moveTo(popupPoint, false)) === false,
+          { popupGap, popupPoint });
+      } else {
+        v.macPopupRendererArmsSkipped = { popupPoint, popupGap };
       }
       await window.webContents.executeJavaScript(`document.getElementById('ctxmenu').hidden = true`);
 
       // The poll itself, single-stepped under a controlled cursor: parked on
       // a gap outside every halo it ignores; one tick after the cursor
       // lands on a panel it is interactive at the near cadence.
-      let gapFar = null;
-      for (let gx = 0; gx < bounds.width && !gapFar; gx += 40)
-        for (let gy = 0; gy < bounds.height && !gapFar; gy += 40)
-          if (!ctx.screenShapeDecision(bounds.x + gx, bounds.y + gy, ctx.macHittest.MAX_MARGIN).near)
-            gapFar = { x: gx, y: gy };
+      // Outside the BASE halo: a parked cursor (travel 0) is judged with
+      // ENTER_MARGIN, and the hosted runner's small display has no point
+      // clear of the 96-DIP flick halo at all.
+      const gapFar = findGap(ctx.macHittest.ENTER_MARGIN + 1);
       ctx.setMacState({ rendererOver: false, pollOver: false, held: false });
       if (gapFar && rect) {
         ctx.setMacCursor({ x: bounds.x + gapFar.x, y: bounds.y + gapFar.y });
