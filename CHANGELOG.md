@@ -4,7 +4,7 @@ Notable changes to ClaudeAmp. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 the `package.json` version, which CI requires to agree with `js/version.js`.
 
-## [Unreleased]
+## [1.7.6] - 2026-09-03
 
 ### Changed
 - Chat: every model shows a typing indicator, three dots pulsing in a
@@ -18,7 +18,6 @@ the `package.json` version, which CI requires to agree with `js/version.js`.
   spacing above and below the URL.
 - Visualization window: the music-source dropdown lettering carries the
   same emboss as the RAIN and search buttons beside it.
-
 - Snake: the board is twice as dense (50x30 cells), so the snake and its
   pellet are half the size on screen at the same pace, and the pellet is a
   square like the snake's cells instead of a round dot.
