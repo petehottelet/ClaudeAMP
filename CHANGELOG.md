@@ -4,7 +4,7 @@ Notable changes to ClaudeAmp. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 the `package.json` version, which CI requires to agree with `js/version.js`.
 
-## [Unreleased]
+## [1.7.6] - 2026-09-03
 
 ### Changed
 - Chat: every model shows a typing indicator, three dots pulsing in a

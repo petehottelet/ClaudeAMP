@@ -1,7 +1,7 @@
 {
   "name": "claudeamp",
   "productName": "ClaudeAmp",
-  "version": "1.7.5",
+  "version": "1.7.6",
   "description": "A classically-styled terminal interface for Claude Code, OpenAI Codex, and Ollama. For Windows, macOS, and Linux.",
   "main": "electron/main.cjs",
   "author": "Pete Hottelet",
