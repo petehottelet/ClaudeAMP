@@ -32,16 +32,11 @@ var CLAUDEAMP_MENU = [
     { id: "toggle-win-usage", label: "Usage Monitor", kind: "check", accelerator: "CmdOrCtrl+5" },
     { id: "toggle-win-mb", label: "Visualization", kind: "check", accelerator: "CmdOrCtrl+6" },
     { id: "toggle-win-term", label: "Terminal", kind: "check", accelerator: "CmdOrCtrl+7" },
+    // No Mode or zoom-step rows (owner's call): the Terminal check is the
+    // mode switch, and the zoom steps live in Settings > Display. The
+    // shortcuts stay so the keyboard zoom keeps working everywhere.
     { type: "separator" },
-    { id: "mode-chat", label: "Mode: AI Chat", kind: "radio", group: "mode" },
-    { id: "mode-shell", label: "Mode: Real Terminal", kind: "radio", group: "mode" },
-    { type: "separator" },
-    { id: "zoom-1", label: "Zoom 1x", kind: "radio", group: "zoom", accelerator: "CmdOrCtrl+0" },
-    { id: "zoom-1.5", label: "Zoom 1.5x", kind: "radio", group: "zoom" },
-    { id: "zoom-2", label: "Zoom 2x", kind: "radio", group: "zoom" },
-    { id: "zoom-2.5", label: "Zoom 2.5x", kind: "radio", group: "zoom" },
-    { id: "zoom-3", label: "Zoom 3x", kind: "radio", group: "zoom" },
-    { type: "separator" },
+    { id: "zoom-1", label: "Actual Size", accelerator: "CmdOrCtrl+0" },
     { id: "zoom-in", label: "Zoom In", accelerator: "CmdOrCtrl+=" },
     { id: "zoom-out", label: "Zoom Out", accelerator: "CmdOrCtrl+-" },
   ] },

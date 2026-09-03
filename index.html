@@ -409,29 +409,6 @@
     </div>
   </div>
 
-  <!-- ============================= ABOUT DIALOG ============================= -->
-  <div class="w95-dialog about-dialog" id="dlg-about" hidden>
-    <div class="w95-title"><span>About ClaudeAmp</span><button class="w95-x" data-close>×</button></div>
-    <div class="w95-body">
-      <img class="about-logo" src="assets/claudeamp-logo-stacked.png" alt="CLAUDEAMP">
-      <p class="about-url"><a href="https://www.claudeamp.com" target="_blank" rel="noopener">WWW.CLAUDEAMP.COM</a></p>
-      <p class="about-tagline"><b>ClaudeAmp <span id="about-version"></span></b><br>
-         A classically-styled terminal interface for Claude Code, OpenAI Codex,
-         and Ollama. For Windows, macOS, and Linux.</p>
-      <p>Not affiliated with Winamp, Nullsoft, AOL, Anthropic, OpenAI, Google,
-         YouTube, or Ollama.</p>
-      <p class="about-credit">Created by <b>Pete Hottelet</b><br>
-        <a href="https://github.com/petehottelet/claudeamp" target="_blank" rel="noopener">GITHUB.COM/PETEHOTTELET/CLAUDEAMP</a>
-      </p>
-      <p class="w95-note">Tips: press ENTER to chat, ESC to stop a reply.
-         Drag windows anywhere - they snap together. Double-click a title bar
-         to roll a window up. Right-click for the menu. The EQ sliders tune
-         your AI: pick the model on the left, then shape how it thinks on
-         the bands.</p>
-      <div class="w95-row"><button class="w95-btn" data-close>OK</button></div>
-    </div>
-  </div>
-
 </div>
 
 <!-- ===================== MODERN SETTINGS (full-window overlay) ===================== -->
@@ -814,6 +791,50 @@
     <footer class="footer">
       <button class="ghost" type="button" id="sm-cancel">Cancel</button>
       <button class="primary" type="button" id="sm-save">Save</button>
+    </footer>
+  </main>
+</div>
+
+<!-- ============ ABOUT (modern overlay, the Settings panel's design language) ============ -->
+<div id="about-modern" class="modern-ui" hidden>
+  <main class="window" role="dialog" aria-modal="true" aria-labelledby="am-title">
+    <header class="header">
+      <div class="brand">
+        <div class="app-icon" id="am-icon" aria-hidden="true"></div>
+        <div>
+          <h1 id="am-title">About ClaudeAmp</h1>
+          <p class="subtitle">Version <span id="about-version"></span></p>
+        </div>
+      </div>
+      <button class="close" type="button" aria-label="Close" id="am-close">×</button>
+    </header>
+
+    <div class="content">
+      <section class="section about-hero">
+        <img class="about-logo" src="assets/claudeamp-logo-stacked.png" alt="CLAUDEAMP">
+        <p class="about-url"><a href="https://www.claudeamp.com" target="_blank" rel="noopener">www.claudeamp.com</a></p>
+        <p class="about-tagline">A classically-styled terminal interface for Claude Code, OpenAI Codex,
+          and Ollama. For Windows, macOS, and Linux.</p>
+        <p class="section-help">Not affiliated with Winamp, Nullsoft, AOL, Anthropic, OpenAI, Google,
+          YouTube, or Ollama.</p>
+      </section>
+      <section class="section about-credit">
+        <p>Created by <b>Pete Hottelet</b></p>
+        <p><a href="https://github.com/petehottelet/claudeamp" target="_blank" rel="noopener">github.com/petehottelet/claudeamp</a></p>
+      </section>
+      <section class="section">
+        <div class="section-head">
+          <h2 class="section-title">Tips</h2>
+        </div>
+        <p class="section-help">Press ENTER to chat, ESC to stop a reply. Drag windows anywhere; they
+          snap together. Double-click a title bar to roll a window up. Right-click for the menu.
+          The EQ sliders tune your AI: pick the model on the left, then shape how it thinks on
+          the bands.</p>
+      </section>
+    </div>
+
+    <footer class="footer">
+      <button class="primary" type="button" id="am-ok">OK</button>
     </footer>
   </main>
 </div>

@@ -1693,7 +1693,7 @@
     WM.toggle(id); syncWinButtons();
   }
   const MENU_COMMANDS = {
-    "about": () => showDialog("dlg-about"),
+    "about": openAbout,
     "welcome": openSetup,
     "settings": openSettings,
     "open-audio": () => $("file-audio").click(),
@@ -1790,18 +1790,11 @@
       winItem("Playlist", "win-pl"),
       winItem("Usage Monitor", "win-usage"),
       winItem("Visualization", "win-mb"),
+      // The Terminal check doubles as the mode switch; the Mode rows and
+      // the zoom steps left the dropdown (owner's call) - zoom lives in
+      // Settings > Display and on the Cmd/Ctrl shortcuts.
       { label: "Terminal", checked: WM.visible("win-term"),
         fn: () => runMenuCommand("toggle-win-term") },
-      "-",
-      { label: "Mode: AI Chat", checked: S.chatMode !== "shell", fn: () => runMenuCommand("mode-chat") },
-      { label: "Mode: Real Terminal", checked: S.chatMode === "shell",
-        disabled: !window.claudeampTerm, fn: () => runMenuCommand("mode-shell") },
-      "-",
-      { label: "Zoom 1x", checked: S.zoom === 1, fn: () => runMenuCommand("zoom-1") },
-      { label: "Zoom 1.5x", checked: S.zoom === 1.5, fn: () => runMenuCommand("zoom-1.5") },
-      { label: "Zoom 2x", checked: S.zoom === 2, fn: () => runMenuCommand("zoom-2") },
-      { label: "Zoom 2.5x", checked: S.zoom === 2.5, fn: () => runMenuCommand("zoom-2.5") },
-      { label: "Zoom 3x", checked: S.zoom === 3, fn: () => runMenuCommand("zoom-3") },
       ...(accountItems.length ? ["-", ...accountItems] : []),
       "-",
       { label: "Quit ClaudeAmp", fn: () => runMenuCommand("quit") },
@@ -2414,6 +2407,50 @@
     bar.addEventListener("pointerup", () => { drag = false; });
   });
 
+  /* Settings and About sit centered on a full-window backdrop. Dragging
+     the header offsets the panel with a transform, so the centering rule
+     stays its resting position and each open starts centered again. The
+     panel lives outside the zoomed desktop, but the scale is measured
+     rather than assumed so a zoomed ancestor would still drag 1:1. */
+  const modernDrags = new Map();
+  function makeModernDraggable(overlayId) {
+    if (modernDrags.has(overlayId)) return;
+    const overlay = $(overlayId);
+    const panel = overlay && overlay.querySelector(".window");
+    const bar = panel && panel.querySelector(".header");
+    if (!bar) return;
+    panel.classList.add("draggable");
+    let dx = 0, dy = 0, sx = 0, sy = 0, ox = 0, oy = 0, minY = 0, drag = false;
+    const place = () => { panel.style.transform = dx || dy ? `translate(${dx}px, ${dy}px)` : ""; };
+    const scale = () => panel.getBoundingClientRect().width / (panel.offsetWidth || 1) || 1;
+    bar.addEventListener("pointerdown", e => {
+      if (e.button !== 0 || e.target.closest("button, a, input")) return;
+      const z = scale();
+      drag = true;
+      sx = e.clientX / z; sy = e.clientY / z; ox = dx; oy = dy;
+      // the header may rise no higher than the backdrop's top edge
+      minY = dy - panel.getBoundingClientRect().top / z;
+      try { bar.setPointerCapture(e.pointerId); } catch (_) {}
+      e.preventDefault();
+    });
+    bar.addEventListener("pointermove", e => {
+      if (!drag) return;
+      const z = scale();
+      dx = ox + (e.clientX / z - sx);
+      dy = Math.max(minY, oy + (e.clientY / z - sy));
+      panel.classList.add("dragging");
+      place();
+    });
+    const stop = () => { drag = false; panel.classList.remove("dragging"); };
+    bar.addEventListener("pointerup", stop);
+    bar.addEventListener("pointercancel", stop);
+    modernDrags.set(overlayId, () => { dx = dy = 0; place(); });
+  }
+  function resetModernDrag(overlayId) {
+    const reset = modernDrags.get(overlayId);
+    if (reset) reset();
+  }
+
   async function logoutCli(cli) {
     const label = cli === "codex" ? "CODEX" : "CLAUDE";
     if (!bridgeStatus.token) {
@@ -2647,18 +2684,37 @@
     });
   }
 
+  function mountClawMark(hostId) {
+    const host = $(hostId);
+    if (!host || host.firstChild) return;
+    const clawMark = document.createElement("img");
+    clawMark.className = "about-mark";
+    clawMark.src = "assets/claw-mark.png";
+    clawMark.alt = "";
+    host.appendChild(clawMark);
+  }
+  /* About: the same white panel as Settings (it was a Win95 dialog). */
+  let aboutWired = false;
+  function openAbout() {
+    const ov = $("about-modern");
+    if (!ov) return;
+    mountClawMark("am-icon");
+    if (!aboutWired) {
+      aboutWired = true;
+      const close = () => { ov.hidden = true; };
+      $("am-close").addEventListener("click", close);
+      $("am-ok").addEventListener("click", close);
+      document.addEventListener("keydown", e => { if (e.key === "Escape" && !ov.hidden) close(); });
+      makeModernDraggable("about-modern");
+    }
+    resetModernDrag("about-modern");
+    ov.hidden = false;
+  }
   function openSettings() {
     const ov = $("settings-modern");
     if (!ov) return;
     smShowTab("model"); // always open on the first tab
-    const iconHost = $("sm-icon");
-    if (iconHost && !iconHost.firstChild) {
-      const clawMark = document.createElement("img");
-      clawMark.className = "about-mark";
-      clawMark.src = "assets/claw-mark.png";
-      clawMark.alt = "";
-      iconHost.appendChild(clawMark);
-    }
+    mountClawMark("sm-icon");
     const p = document.querySelector('input[name="sm-provider"][value="' + S.provider + '"]');
     if (p) p.checked = true;
     const wv = S.cliAccess === "workspace" ? "workspace" : "read-only";
@@ -2686,6 +2742,7 @@
       wireSpotifyRow("sm");
       $("sm-close").addEventListener("click", closeSettings);
       $("sm-cancel").addEventListener("click", closeSettings);
+      makeModernDraggable("settings-modern");
       $("sm-save").addEventListener("click", saveSettingsModern);
       $("sm-claude-login").addEventListener("click", openClaudeLogin);
       $("sm-codex-login").addEventListener("click", openCodexLogin);
@@ -2715,6 +2772,7 @@
         if (e.key === "Escape" && !$("settings-modern").hidden) closeSettings();
       });
     }
+    resetModernDrag("settings-modern");
     ov.hidden = false;
     refreshBridgeStatus(true).then(renderSmInfo).catch(() => {});
   }
@@ -2897,7 +2955,7 @@
     $("clutterbar").addEventListener("click", e => {
       const act = e.target.dataset && e.target.dataset.act;
       if (act === "options") openSettings();
-      else if (act === "about") showDialog("dlg-about");
+      else if (act === "about") openAbout();
       else if (act === "info") { S.lcdMode = S.lcdMode === "time" ? "tokens" : "time"; saveSettings(); }
       else if (act === "double") setZoom(S.zoom > 1 ? 1 : 2);
       else if (act === "viz") WM.toggle("win-usage");
@@ -3223,7 +3281,7 @@
       else if (key === "l") openAddTrack();
       else if (event.key === "Delete" && selected.size) {
         Music.removeTracks(selectionIndices()); clearSelection(); renderPlaylist();
-      } else if (event.key === "F1") showDialog("dlg-about");
+      } else if (event.key === "F1") openAbout();
     });
 
     // chat
@@ -3484,7 +3542,8 @@
      with 192 procedural cyber glyphs, per-glyph speeds/trails,
      persistence-fade trails and glowing heads. */
   let rainState = null;
-  function rainGlyphPath(ctx, index, ox, oy, glyphH, color) {
+  // weight scales the stroke width (and dot radius) of the glyph data.
+  function rainGlyphPath(ctx, index, ox, oy, glyphH, color, weight = 1) {
     const [cw, ch] = GLYPHS.canvas;
     const sx = glyphH * cw / ch / cw, sy = glyphH / ch;
     ctx.strokeStyle = color;
@@ -3494,12 +3553,12 @@
     for (const s of GLYPHS.strokes[index]) {
       if (s[0] === "d") {
         ctx.beginPath();
-        ctx.arc(ox + s[1] * sx, oy + s[2] * sy, Math.max(0.5, s[3] * sx), 0, 7);
+        ctx.arc(ox + s[1] * sx, oy + s[2] * sy, Math.max(0.5, s[3] * sx * weight), 0, 7);
         ctx.fill();
         continue;
       }
       ctx.beginPath();
-      ctx.lineWidth = Math.max(0.9, s[s.length - 1] * sx);
+      ctx.lineWidth = Math.max(0.9, s[s.length - 1] * sx * weight);
       ctx.moveTo(ox + s[1] * sx, oy + s[2] * sy);
       if (s[0] === "l") ctx.lineTo(ox + s[3] * sx, oy + s[4] * sy);
       else ctx.quadraticCurveTo(ox + s[3] * sx, oy + s[4] * sy, ox + s[5] * sx, oy + s[6] * sy);
@@ -3518,11 +3577,16 @@
     const gw = cell * GLYPHS.canvas[0] / GLYPHS.canvas[1];
     const size = { w: Math.ceil(gw) + pad * 2, h: cell + pad * 2 };
     const count = GLYPHS.strokes.length;
-    // Pre-render every glyph twice (dim trail stamp + glowing head) so the
+    // Pre-render every glyph twice (trail stamp + glowing head) so the
     // frame loop stays at drawImage calls, exactly like the original.
     // Greens keyed to the playlist window's text green (--pl-green #00FF00):
-    // a dim pure-green trail, a full #00FF00 head with matching glow, and a
+    // a solid green trail, a full #00FF00 head with matching glow, and a
     // pale-green (not blue-white) highlight so the leading glyph still pops.
+    // Owner change on top of the 1.5.1 look: the trail stamp is drawn at
+    // 1.8x stroke weight in near-full green so every glyph in a drip reads
+    // as a filled green character. The original's thin rgb(0,150,0) strokes
+    // came out as black outlines once the 1.5x cells were scaled onto the
+    // screen.
     const trail = previous?.trail?.length === count ? previous.trail : [];
     const head = previous?.head?.length === count ? previous.head : [];
     if (!trail.length || !head.length) {
@@ -3531,7 +3595,7 @@
         let c = document.createElement("canvas");
         c.width = size.w; c.height = size.h;
         let ctx = c.getContext("2d");
-        rainGlyphPath(ctx, g, pad, pad, cell, "rgb(0,150,0)");
+        rainGlyphPath(ctx, g, pad, pad, cell, "rgb(0,230,0)", 1.8);
         trail.push(c);
         c = document.createElement("canvas");
         c.width = size.w; c.height = size.h;
@@ -3572,8 +3636,11 @@
     if (!rainState) buildRain();
     if (!rainState) return;
     const { trail, head, pad, stepY, columns, count, W, H } = rainState;
-    // persistence: last frame's heads dim slowly into long trails (full canvas)
-    fxCtx.fillStyle = "rgba(0,0,0,0.034)";
+    // persistence: last frame's heads dim slowly into long trails (full
+    // canvas). 0.016/frame (the 1.5.1 original was 0.034) keeps the glyphs
+    // behind the head green for the length of a drip instead of letting
+    // them go black a few cells back.
+    fxCtx.fillStyle = "rgba(0,0,0,0.016)";
     fxCtx.fillRect(0, 0, W, H);
     const dt = 1 / 60;
     const pace = 1 + energy * 0.25; // original speed, swaying a touch with the music

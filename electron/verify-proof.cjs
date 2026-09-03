@@ -249,6 +249,34 @@ async function runVerifyProof(window) {
     };
     check("providerIconsPackaged", providerIcons.length === 6 && providerIcons.every(icon =>
       expectedProviderIcons[icon.provider] === icon.src && icon.loaded), providerIcons);
+    // Settings (and About, same wiring) drag by their header: a synthetic
+    // 60x30 pointer drag on the header must move the panel by exactly that.
+    const settingsDrag = await window.webContents.executeJavaScript(`(() => {
+      document.querySelector('#clutterbar [data-act="options"]')?.click();
+      const overlay = document.getElementById('settings-modern');
+      const panel = overlay?.querySelector('.window');
+      const bar = panel?.querySelector('.header');
+      if (!overlay || overlay.hidden || !bar) return { opened: !!overlay && !overlay.hidden };
+      const before = panel.getBoundingClientRect();
+      const at = (type, x, y) => bar.dispatchEvent(new PointerEvent(type, {
+        bubbles: true, cancelable: true, pointerId: 7, pointerType: 'mouse', button: 0, buttons: 1,
+        clientX: x, clientY: y }));
+      const x0 = before.left + 40, y0 = before.top + 20;
+      at('pointerdown', x0, y0);
+      at('pointermove', x0 + 60, y0 + 30);
+      const during = getComputedStyle(bar).cursor;
+      at('pointerup', x0 + 60, y0 + 30);
+      const after = panel.getBoundingClientRect();
+      const result = { opened: true, transform: panel.style.transform, cursor: getComputedStyle(bar).cursor,
+        cursorWhileDragging: during, movedX: Math.round(after.left - before.left),
+        movedY: Math.round(after.top - before.top) };
+      document.getElementById('sm-close').click();
+      result.closed = overlay.hidden;
+      return result;
+    })()`);
+    check("settingsWindowDraggable", settingsDrag.opened && settingsDrag.movedX === 60 && settingsDrag.movedY === 30 &&
+      /translate\(/.test(settingsDrag.transform) && settingsDrag.cursor === "grab" &&
+      settingsDrag.cursorWhileDragging === "grabbing" && settingsDrag.closed, settingsDrag);
     const onboardingArrow = await window.webContents.executeJavaScript(`(() => {
       const tip = document.getElementById('menu-onboarding');
       const arrow = tip?.querySelector('.onboarding-arrow');
@@ -687,15 +715,20 @@ async function runVerifyProof(window) {
     const terminalChrome = await window.webContents.executeJavaScript(`(() => {
       document.querySelector('#win-main .tb-menu').click();
       const rows = Array.from(document.querySelectorAll('#ctxmenu .mi'));
-      const ai = rows.find(row => row.textContent.trim() === 'Mode: AI Chat');
-      const shell = rows.find(row => row.textContent.trim() === 'Mode: Real Terminal');
+      const label = row => row.textContent.trim();
+      // The Terminal check is the mode: checked (and Chat unchecked) means
+      // Real Terminal. The Mode and zoom rows left the dropdown.
+      const terminalRow = rows.find(row => label(row) === 'Terminal');
+      const chatRow = rows.find(row => label(row) === 'Chat');
+      const legacyRows = rows.map(label).filter(text => /^(Mode: |Zoom )/.test(text));
       const playlist = document.getElementById('pl-scroll');
       const terminal = document.getElementById('term-scroll');
       const playlistThumb = playlist?.querySelector('.amp-scroll-thumb');
       const terminalThumb = terminal?.querySelector('.amp-scroll-thumb');
       const result = {
-        aiChecked: !!ai?.classList.contains('checked'),
-        shellChecked: !!shell?.classList.contains('checked'),
+        terminalChecked: !!terminalRow?.classList.contains('checked'),
+        chatChecked: !!chatRow?.classList.contains('checked'),
+        legacyRows,
         terminalScrollbar: !!terminal,
         sameWidth: !!playlist && !!terminal && getComputedStyle(playlist).width === getComputedStyle(terminal).width,
         sameThumb: !!playlistThumb && !!terminalThumb &&
@@ -705,7 +738,8 @@ async function runVerifyProof(window) {
       document.getElementById('ctxmenu').hidden = true;
       return result;
     })()`);
-    check("terminalMenuShowsRealMode", terminalChrome.shellChecked && !terminalChrome.aiChecked, terminalChrome);
+    check("terminalMenuShowsRealMode", terminalChrome.terminalChecked && !terminalChrome.chatChecked &&
+      terminalChrome.legacyRows.length === 0, terminalChrome);
     check("terminalUsesPlaylistScrollbar", terminalChrome.terminalScrollbar && terminalChrome.sameWidth &&
       terminalChrome.sameThumb && terminalChrome.nativeScrollbarHidden, terminalChrome);
     const overlayState = await window.webContents.executeJavaScript(`(() => {
@@ -1008,7 +1042,7 @@ async function runSmokeProof(window) {
         ollamaProvider: !!ClaudeAPI.PROVIDERS.ollama,
         ollamaLocalBridge: ClaudeAPI.PROVIDERS.ollama?.local === 'ollama',
         ollamaOption: !!document.querySelector('input[name="sm-provider"][value="ollama"]'),
-        aboutTaglineExact: /A classically-styled terminal interface for Claude Code, OpenAI Codex,\\s+and Ollama\\. For Windows, macOS, and Linux\\./.test(document.getElementById('dlg-about').textContent),
+        aboutTaglineExact: /A classically-styled terminal interface for Claude Code, OpenAI Codex,\\s+and Ollama\\. For Windows, macOS, and Linux\\./.test(document.getElementById('about-modern').textContent),
         startupDockedIds: WM.dockedIds('win-main'),
         defaultZoom: Number(getComputedStyle(document.getElementById('desktop')).zoom),
         onboardingTooltip,
@@ -1058,20 +1092,21 @@ async function runSmokeProof(window) {
     await wait(180);
 
     if (ctx.smokeAbout) {
+      // About is a .modern-ui overlay (one full-window solid rect in the
+      // native shape), the same white panel as Settings.
       await window.webContents.executeJavaScript(`(() => {
-        const dialog = document.getElementById('dlg-about');
-        dialog.hidden = false;
-        dialog.style.left = '400px';
-        dialog.style.top = '70px';
-        dialog.style.zIndex = '200';
+        document.querySelector('#clutterbar [data-act="about"]')?.click();
+        const overlay = document.getElementById('about-modern');
+        if (overlay) overlay.hidden = false;
       })()`);
       await wait(180);
       Object.assign(report, await window.webContents.executeJavaScript(`(() => {
-        const dialog = document.getElementById('dlg-about');
-        const title = getComputedStyle(dialog.querySelector('.w95-title'));
+        const dialog = document.getElementById('about-modern');
+        const panel = dialog.querySelector('.window');
         return {
           aboutVisible: !dialog.hidden,
-          aboutGradient: title.backgroundImage,
+          aboutModernSurface: getComputedStyle(panel).backgroundColor === 'rgb(255, 255, 255)' &&
+            !dialog.querySelector('.w95-title'),
           aboutHasAuthor: /Pete Hottelet/.test(dialog.textContent),
           aboutHasGithub: !!dialog.querySelector('a[href*="github.com/petehottelet/claudeamp"]'),
           aboutRemovedLoving: !/loving/i.test(dialog.textContent),
