@@ -19,7 +19,7 @@
   </p>
 </div>
 
-![ClaudeAmp interface with terminal, playlist, equalizer, usage monitor, and glyph-rain visualization](docs/claudeamp-interface.png)
+![Animated ClaudeAmp interface with terminal, playlist, equalizer, usage monitor, and glyph-rain visualization](docs/claudeamp-interface.gif)
 
 **ClaudeAmp is a classically-styled terminal interface** for Claude Code,
 OpenAI Codex, and Ollama on Windows, macOS, and Linux. Six draggable, snapping,
