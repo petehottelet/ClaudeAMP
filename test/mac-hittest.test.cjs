@@ -67,19 +67,53 @@ test("the halo grows with cursor speed and stays within its bounds", () => {
   assert.strictEqual(armMargin(undefined), ENTER_MARGIN);
 });
 
-test("the poll is protected from App Nap and renderer throttling", () => {
-  // macOS coalesced the 6-16ms cursor poll into multi-second ticks once it
-  // judged the transparent overlay idle/occluded; the first click after a
-  // pause then fell through to the app behind. The poll IS the input path,
-  // so suspension stays off at all three layers.
+test("shape reports never re-ignore the window, and nothing pauses the poll", () => {
   const fs = require("node:fs");
   const path = require("node:path");
-  const main = fs.readFileSync(path.join(__dirname, "..", "electron", "main.cjs"), "utf8");
+  const read = f => fs.readFileSync(path.join(__dirname, "..", f), "utf8");
+  const main = read("electron/main.cjs");
+  const native = read("js/native.js");
+  const app = read("js/app.js");
+  const proofs = read("electron/verify-proof.cjs");
   const pkg = require("../package.json");
-  assert.match(main, /powerSaveBlocker\.start\("prevent-app-suspension"\)/);
-  assert.match(main, /backgroundThrottling:\s*false/);
+  // The bug behind 1.7.3's "clicks fall through after resting": the
+  // first-show arming (macSetIgnore(true)) ran on every shape report.
+  // maybeShow now arms once and only re-decides afterwards.
+  assert.match(main, /if \(macArmed\) \{[\s\S]*macKick\(\);[\s\S]*return;[\s\S]*\}\s*macArmed = true;/);
+  assert.equal((main.match(/macSetIgnore\(true\)/g) || []).length, 1,
+    "macSetIgnore(true) may appear only in the one-shot first-show arming");
+  assert.match(proofs, /macShapeReportKeepsInteractive/);
+  // The mac runner also exercises: sustained churn under a setIgnoreMouseEvents
+  // spy, the renderer hit-test path, an overflowing popup, the single-stepped
+  // poll under a controlled cursor, and (capability-gated, reported) real
+  // HID events against the NSWindow flag itself.
+  for (const name of ["macRestingCursorSurvivesReports", "macUnchangedShapeNotResent",
+    "macRendererHitTestArms", "macPopupInNativeShape", "macPollParkedOnGapIgnores",
+    "macPollArmsInOneTick", "macPollFollowsRealCursor", "macNativeIgnoreDropsClick"])
+    assert.match(proofs, new RegExp(name));
+  assert.match(main, /setMacCursor\(point\)/);
+  // The held pin comes from pointer events (mouse events are suppressed
+  // for the whole press once a slider/grip cancels pointerdown under
+  // pointer capture); dragend releases it; only a window exit disarms.
+  for (const type of ["pointerdown", "pointerup", "pointercancel", "dragend"])
+    assert.match(native, new RegExp(`addEventListener\\("${type}"`));
+  assert.match(native, /e\.target === document\.documentElement\) apply\(false\)/);
+  assert.match(main, /stepMacPoll\(\) \{ return macPollOnce\(\); \}/);
+  // Report storm: the ticker wrote `hidden` every frame (a same-value
+  // assignment still queues a mutation record), and native.js re-sent an
+  // unchanged shape on each; both ends now only act on real change.
+  assert.match(app, /if \(mbNoteEl\.hidden !== noteHidden\) mbNoteEl\.hidden = noteHidden;/);
+  assert.match(native, /if \(forceReport \|\| key !== lastReport\)/);
+  assert.match(native, /setInterval\(\(\) => \{ forceReport = true; scheduleShape\(\); \}, 1000\)/);
+  // The poll: no App Nap (plist opt-out), no renderer throttling, not gated
+  // on Electron's accidental isVisible(), re-decided on activation/focus.
   assert.strictEqual(pkg.build.mac.extendInfo.NSAppSleepDisabled, true);
-  // any wake re-decides immediately instead of waiting out a stretched timer
-  assert.match(main, /app\.on\("activate", kick\)/);
-  assert.match(main, /app\.on\("browser-window-focus", kick\)/);
+  assert.match(main, /backgroundThrottling:\s*false/);
+  assert.doesNotMatch(main, /win\.isVisible\(\)\)\s*\{[\s\S]{0,80}getCursorScreenPoint/);
+  assert.match(main, /!win\.isMinimized\(\)\)\s*\{/);
+  assert.match(main, /app\.on\("did-become-active", \(\) => macKick\(\)\)/);
+  assert.match(main, /app\.on\("browser-window-focus", \(\) => macKick\(\)\)/);
+  // powerSaveBlocker("prevent-app-suspension") is a no-idle-sleep assertion
+  // on macOS (keeps the Mac awake) and does nothing for App Nap: gone.
+  assert.doesNotMatch(main, /powerSaveBlocker/);
 });

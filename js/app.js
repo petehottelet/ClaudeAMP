@@ -3754,8 +3754,12 @@
     .observe(mbNoteEl, { childList: true, characterData: true, subtree: true });
   function drawMbTicker(now) {
     const holding = now < mbHoldUntil && mbNoteEl.textContent.trim();
-    mbNoteEl.hidden = !holding;
-    mbTickerEl.hidden = !!holding;
+    // Write `hidden` only when it changes: a same-value assignment still
+    // queues a mutation record, and native.js re-reports the window shape
+    // on every one - this line used to trigger a report every frame.
+    const noteHidden = !holding, tickerHidden = !!holding;
+    if (mbNoteEl.hidden !== noteHidden) mbNoteEl.hidden = noteHidden;
+    if (mbTickerEl.hidden !== tickerHidden) mbTickerEl.hidden = tickerHidden;
     if (holding || !WM.visible("win-mb")) return;
     if (now - mbLastBuild > 500) {
       mbLastBuild = now;

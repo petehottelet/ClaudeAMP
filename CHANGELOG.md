@@ -4,6 +4,32 @@ Notable changes to ClaudeAmp. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 the `package.json` version, which CI requires to agree with `js/version.js`.
 
+## [1.7.4] - 2026-09-03
+
+### Fixed
+- macOS: the real cause of clicks falling through after the cursor came to
+  rest. Every window-shape report (once a second, and on every DOM change)
+  re-ran the first-launch "ignore the mouse" setup, so the window flipped
+  to click-through until the next cursor poll tick; a click made after
+  resting was a coin flip while quick successive clicks always landed.
+  Shape reports now only re-decide, the visualization ticker no longer
+  triggers a report every frame, unchanged shapes are not re-sent, and the
+  cursor poll is no longer gated on a window-visibility check that only
+  read true by accident. The 1.7.3 power-save blocker, which kept the Mac
+  from idle-sleeping and did nothing for this, is removed.
+- macOS: dragging a slider, grip, or resizer keeps the window listening
+  even when the hand drifts off the panel. Those controls cancel the
+  pointer press (which silently suppresses the mouse events the drag pin
+  listened for), so the pin never engaged and a drift past the panel's
+  halo could flip the window to click-through mid-drag and swallow the
+  next click. The pin now follows pointer events; finishing a playlist
+  drag also releases it, so the first click into another app afterwards
+  is no longer eaten.
+- macOS: the verification suite on the mac runner now exercises every
+  arming signal, sustained shape churn under a spy, an overflowing
+  popup, the cursor poll under a controlled cursor, and (where the runner
+  allows real input) a genuine click against the native ignore flag.
+
 ## [1.7.3] - 2026-09-01
 
 ### Fixed

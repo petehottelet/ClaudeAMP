@@ -14,6 +14,8 @@
   let frame = 0;
   let lastX = -1, lastY = -1;   // last known cursor position (for re-hit-test)
   let macReeval = () => {};      // set below on macOS; re-runs the hit-test
+  let lastReport = "";           // serialized rects of the last report sent
+  let forceReport = false;       // the 1s belt-and-suspenders resend
   const visible = el => {
     if (el.hidden) return false;
     const style = getComputedStyle(el);
@@ -34,7 +36,15 @@
         height: Math.max(1, Math.ceil(r.bottom) - y),
       };
     }).filter(Boolean);
-    window.claudeampNative.updateShape(rects);
+    // Only report a CHANGED shape (plus the forced 1s resend): chat
+    // streaming, the seek thumb and lamp toggles all mutate the DOM without
+    // moving a panel, and every report costs main a re-decision.
+    const key = rects.map(r => r.x + "," + r.y + "," + r.width + "," + r.height).join(";");
+    if (forceReport || key !== lastReport) {
+      lastReport = key;
+      forceReport = false;
+      window.claudeampNative.updateShape(rects);
+    }
     // A panel or menu can appear/move under a stationary cursor (no mousemove
     // to trigger a re-test), which would leave the window ignoring the mouse
     // over freshly-solid pixels and eat the first click. Re-hit-test here.
@@ -60,7 +70,7 @@
   // ever slips past the observers (or an IPC report is lost), a panel could
   // otherwise stay permanently outside the native hit region - on macOS
   // that reads as a window that ignores clicks until something else moves.
-  setInterval(scheduleShape, 1000);
+  setInterval(() => { forceReport = true; scheduleShape(); }, 1000);
 
   // macOS click-through, driven from here. The main process keeps the
   // full-desktop window ignoring the mouse (forward:true), so mousemove still
@@ -93,10 +103,37 @@
       lastX = e.clientX; lastY = e.clientY;
       if (!held) apply(overPanel(e.clientX, e.clientY));
     }, true);
-    window.addEventListener("mousedown", () => { setHeld(true); apply(true); }, true);
-    const release = e => { setHeld(false); lastX = e.clientX; lastY = e.clientY; apply(overPanel(e.clientX, e.clientY)); };
-    window.addEventListener("mouseup", release, true);
-    window.addEventListener("mouseleave", () => { if (!held) apply(false); }, true);
+    // The pin is driven by POINTER events: every slider, grip and resizer
+    // cancels pointerdown while holding pointer capture, which suppresses
+    // the compatibility mousedown/mouseup for the whole press. A mouse-only
+    // pin never engaged during those drags, the poll alone held the window,
+    // and a hand drifting past the halo mid-press flipped it to ignore -
+    // stranding the capture, which then swallowed the next click. Pointer
+    // events are never suppressed; the mouse listeners stay as a fallback.
+    const press = () => { setHeld(true); apply(true); };
+    const releaseAt = e => {
+      setHeld(false);
+      lastX = e.clientX; lastY = e.clientY;
+      apply(overPanel(e.clientX, e.clientY));
+    };
+    // pointercancel and dragend carry no trustworthy position: re-test the
+    // last known one.
+    const releaseHere = () => { setHeld(false); apply(overPanel(lastX, lastY)); };
+    window.addEventListener("pointerdown", press, true);
+    window.addEventListener("mousedown", press, true);
+    window.addEventListener("pointerup", releaseAt, true);
+    window.addEventListener("mouseup", releaseAt, true);
+    window.addEventListener("pointercancel", releaseHere, true);
+    // An HTML5 drag (playlist reorder) ends with dragend, never mouseup;
+    // without this the pin stayed set and the next click anywhere on the
+    // desktop went to ClaudeAmp instead of the app behind.
+    window.addEventListener("dragend", releaseHere, true);
+    // Only a real exit from the window disarms. The capture-phase listener
+    // also sees every element's mouseleave, and Chromium fires those under
+    // a resting cursor whenever the element beneath it is replaced.
+    window.addEventListener("mouseleave", e => {
+      if (!held && e.target === document.documentElement) apply(false);
+    }, true);
   }
 
   // the main window's close button quits the app (in the browser it just
