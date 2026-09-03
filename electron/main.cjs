@@ -9,7 +9,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
-const { app, BrowserWindow, dialog, ipcMain, Menu, powerSaveBlocker, safeStorage, screen, shell, utilityProcess } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, Menu, safeStorage, screen, shell, utilityProcess } = require("electron");
 const { readyMarker, readyProbe, readyScreenReset, hasReadyMarker,
   stripReadyProbe } = require("./terminal-protocol.cjs");
 const { resolveLoginShell, loginShellArgs } = require("./terminal-platform.cjs");
@@ -154,6 +154,8 @@ function safeShape(rects) {
 let macRendererOver = false;   // renderer hit-test: cursor over a panel
 let macHeld = false;           // renderer: a mouse button is held down
 let macPollOver = false;       // main poll: cursor inside a shape rect
+let macArmed = false;          // first-show arming done (one-shot, see maybeShow)
+let macKick = () => {};        // re-runs the cursor poll now (set by startMacHitTester)
 function macSetIgnore(on) {
   if (!win || win.isDestroyed() || on === macIgnoring) return;
   macIgnoring = on;
@@ -176,13 +178,10 @@ function screenPointOverShape(px, py) {
 }
 function startMacHitTester() {
   if (process.platform !== "darwin" || macPoll) return;
-  // App Nap coalesces this poll's 6-16ms cadence into multi-second ticks
-  // once macOS decides the mostly-transparent overlay is idle/occluded.
-  // The first click after such a pause then found the window still
-  // ignoring the mouse and fell through to the app behind - which
-  // activated that app and made the nap deeper. The poll IS the app's
-  // input path, so suspension must stay off while it runs.
-  try { powerSaveBlocker.start("prevent-app-suspension"); } catch (_) {}
+  // This poll IS the app's input path on macOS. App Nap (which could stretch
+  // its cadence while the app is in the background) is opted out of with
+  // NSAppSleepDisabled in Info.plist; the renderer side is protected by
+  // backgroundThrottling:false. Nothing else may pause or override it.
   let lastX = null, lastY = null;
   // CLAUDEAMP_HITTEST_TRACE=1 appends the poll's decisions to
   // userData/hittest.log - one failing click with this log shows whether
@@ -203,7 +202,10 @@ function startMacHitTester() {
   };
   const tick = () => {
     let cadence = macHittest.FAR_MS;
-    if (win && !win.isDestroyed() && win.isVisible()) {
+    // Not gated on win.isVisible(): Electron's macOS implementation compares
+    // the occlusion state with == against a bit flag and only reads true
+    // by accident. A false reading here would freeze the decision forever.
+    if (win && !win.isDestroyed() && !win.isMinimized()) {
       try {
         const p = screen.getCursorScreenPoint();
         // The halo grows with cursor speed: a flick covers several fixed
@@ -223,17 +225,37 @@ function startMacHitTester() {
     }
     macPoll = setTimeout(tick, cadence);
   };
-  // Any sign of life re-decides NOW instead of waiting out a timer the OS
-  // may have stretched: app activation and window focus both mean the user
-  // is (about to be) interacting.
-  const kick = () => { clearTimeout(macPoll); macPoll = setTimeout(tick, 0); };
-  app.on("activate", kick);
+  // Re-decide NOW instead of waiting out the cadence: on a new shape report
+  // (a panel may have appeared under a resting cursor), when the app
+  // becomes active, and when the window gains focus. No-op while a proof
+  // has frozen the poll (macPoll === null) so deterministic checks are not
+  // raced by a tick.
+  const kick = () => {
+    if (!macPoll) return;
+    clearTimeout(macPoll);
+    macPoll = setTimeout(tick, 0);
+  };
+  macKick = kick;
+  app.on("did-become-active", kick);
   app.on("browser-window-focus", kick);
   macPoll = setTimeout(tick, macHittest.FAR_MS);
 }
 
 function maybeShow() {
   if (!win || win.isDestroyed() || !readyToShow || !receivedShape) return;
+  if (macArmed) {
+    // Every later shape report lands here too (the update-shape handler
+    // calls maybeShow so the FIRST report can show the window). Only
+    // re-decide against the new rects. Never repeat the arming below:
+    // through 1.7.3 it ran on every report, flipping the window to
+    // click-through under a resting cursor until the next poll tick - and
+    // reports arrive on every DOM mutation, so a click made after the
+    // cursor came to rest was a coin flip while quick successive clicks
+    // (each mouse event recomputes) always landed.
+    if (process.platform === "darwin") macKick();
+    return;
+  }
+  macArmed = true;
   if (process.platform === "darwin") {
     // macOS can't clip a window's shape, so the full-desktop window starts
     // ignoring the mouse; the renderer hit-test and the main-process cursor
@@ -380,6 +402,7 @@ function createWindow(port) {
   const area = desktopBounds();
   readyToShow = false;
   receivedShape = false;
+  macArmed = false;
   lastShape = [];
   shapeRevision = 0;
   shapeApplyError = "";

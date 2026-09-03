@@ -14,6 +14,8 @@
   let frame = 0;
   let lastX = -1, lastY = -1;   // last known cursor position (for re-hit-test)
   let macReeval = () => {};      // set below on macOS; re-runs the hit-test
+  let lastReport = "";           // serialized rects of the last report sent
+  let forceReport = false;       // the 1s belt-and-suspenders resend
   const visible = el => {
     if (el.hidden) return false;
     const style = getComputedStyle(el);
@@ -34,7 +36,15 @@
         height: Math.max(1, Math.ceil(r.bottom) - y),
       };
     }).filter(Boolean);
-    window.claudeampNative.updateShape(rects);
+    // Only report a CHANGED shape (plus the forced 1s resend): chat
+    // streaming, the seek thumb and lamp toggles all mutate the DOM without
+    // moving a panel, and every report costs main a re-decision.
+    const key = rects.map(r => r.x + "," + r.y + "," + r.width + "," + r.height).join(";");
+    if (forceReport || key !== lastReport) {
+      lastReport = key;
+      forceReport = false;
+      window.claudeampNative.updateShape(rects);
+    }
     // A panel or menu can appear/move under a stationary cursor (no mousemove
     // to trigger a re-test), which would leave the window ignoring the mouse
     // over freshly-solid pixels and eat the first click. Re-hit-test here.
@@ -60,7 +70,7 @@
   // ever slips past the observers (or an IPC report is lost), a panel could
   // otherwise stay permanently outside the native hit region - on macOS
   // that reads as a window that ignores clicks until something else moves.
-  setInterval(scheduleShape, 1000);
+  setInterval(() => { forceReport = true; scheduleShape(); }, 1000);
 
   // macOS click-through, driven from here. The main process keeps the
   // full-desktop window ignoring the mouse (forward:true), so mousemove still

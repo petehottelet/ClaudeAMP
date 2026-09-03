@@ -4,6 +4,20 @@ Notable changes to ClaudeAmp. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 the `package.json` version, which CI requires to agree with `js/version.js`.
 
+## [Unreleased]
+
+### Fixed
+- macOS: the real cause of clicks falling through after the cursor came to
+  rest. Every window-shape report (once a second, and on every DOM change)
+  re-ran the first-launch "ignore the mouse" setup, so the window flipped
+  to click-through until the next cursor poll tick; a click made after
+  resting was a coin flip while quick successive clicks always landed.
+  Shape reports now only re-decide, the visualization ticker no longer
+  triggers a report every frame, unchanged shapes are not re-sent, and the
+  cursor poll is no longer gated on a window-visibility check that only
+  read true by accident. The 1.7.3 power-save blocker, which kept the Mac
+  from idle-sleeping and did nothing for this, is removed.
+
 ## [1.7.3] - 2026-09-01
 
 ### Fixed

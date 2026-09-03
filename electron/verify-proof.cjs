@@ -269,8 +269,23 @@ async function runVerifyProof(window) {
       ctx.setMacState({ held: true });
       check("macHeldPinsInteractive", ctx.macIgnoring === false);
       ctx.setMacState({ held: false });
+      // A shape report must never re-ignore an interactive window. Through
+      // 1.7.3 the first-show arming ran on EVERY report, so each 1s
+      // re-report and DOM mutation flipped the window to click-through
+      // until the next poll tick: a click made after the cursor came to
+      // rest was a coin flip. With the poll frozen, a fresh report must
+      // leave the ignore flag exactly where the three signals put it.
+      ctx.setMacState({ rendererOver: false, pollOver: true, held: false });
+      check("macArmedBeforeShapeReport", ctx.macIgnoring === false);
+      const revisionBefore = ctx.shapeRevision;
+      await window.webContents.executeJavaScript(
+        `window.claudeampNative.updateShape(${JSON.stringify(ctx.lastShape)})`);
+      for (let i = 0; i < 20 && ctx.shapeRevision === revisionBefore; i++) await wait(25);
+      check("macShapeReportKeepsInteractive",
+        ctx.shapeRevision > revisionBefore && ctx.macIgnoring === false,
+        { revisionBefore, revisionAfter: ctx.shapeRevision, ignoring: ctx.macIgnoring });
       // For the click test below the window must accept input.
-      ctx.setMacState({ rendererOver: true });
+      ctx.setMacState({ rendererOver: true, pollOver: false });
     }
 
     // A real synthesized click through the input pipeline must toggle a
