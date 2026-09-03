@@ -4,6 +4,26 @@ Notable changes to ClaudeAmp. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 the `package.json` version, which CI requires to agree with `js/version.js`.
 
+## [Unreleased]
+
+### Changed
+- Chat: every model shows a typing indicator, three dots pulsing in a
+  bubble on its side of the conversation, from the moment a message is
+  sent until the first token arrives. It used to appear only for models
+  that report their reasoning, and read "THINKING" with trailing dots.
+- Settings: "More details, legal & privacy" unfolds a scrollable panel in
+  place instead of opening a separate dialog.
+- About: the stacked logo is rebuilt from the master artwork (same
+  proportions as the site logo, trimmed to its edges) and sits with equal
+  spacing above and below the URL.
+- Visualization window: the music-source dropdown lettering carries the
+  same emboss as the RAIN and search buttons beside it.
+
+### Fixed
+- Visualization window: the search magnifier no longer comes out lopsided
+  at 1x zoom on displays with fractional scaling (125%, 150%); it is
+  vector art now and resamples evenly instead of nearest-neighbor.
+
 ## [1.7.5] - 2026-09-03
 
 ### Fixed

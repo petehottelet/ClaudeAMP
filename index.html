@@ -312,44 +312,6 @@
     </div>
   </div>
 
-  <div class="w95-dialog legal-dialog" id="dlg-legal" hidden>
-    <div class="w95-title"><span>Details, Legal &amp; Privacy</span><button class="w95-x" data-close>×</button></div>
-    <div class="w95-body legal-body">
-      <p class="legal-h">Privacy &amp; your data</p>
-      <p>ClaudeAmp has no backend of its own &mdash; it runs entirely in your browser (or the local
-      desktop shell) and collects <b>no analytics, no telemetry, and no accounts</b>. API keys you
-      enter stay on this machine &mdash; the desktop app encrypts them with <b>your OS keychain</b>,
-      a plain browser keeps them in <b>localStorage</b> &mdash; and are never sent to a
-      ClaudeAmp server (there isn't one), so use personal keys you can revoke and clear them any time
-      by emptying the fields and saving. When you pick an <b>API model</b> (Claude, OpenAI, Gemini)
-      your messages go straight from your browser to that provider, handled under its own terms and
-      privacy policy. When you pick a <b>subscription model</b> (Claude Code / Codex) no key is
-      needed: the desktop app relays chat to the <code>claude</code> / <code>codex</code> CLI already
-      installed on your machine over a <b>loopback-only</b> local bridge, and that CLI &mdash; not
-      ClaudeAmp &mdash; handles auth; <b>Ollama</b> models are likewise discovered from your
-      loopback-only local service. Music plays through YouTube's embedded IFrame player, so that
-      playback is subject to <b>YouTube's / Google's</b> terms and privacy policy.</p>
-
-      <p class="legal-h">CLI workspace access</p>
-      <p><b>Read only</b> is the safe default &mdash; the CLI can look but not touch. Enable <b>Allow
-      workspace edits</b> only when you want the selected CLI to create or change files in the
-      workspace folder you choose with <b>Workspace...</b>.</p>
-
-      <p class="legal-h">The EQ</p>
-      <p>The left <b>MODEL</b> slider chooses which model in the selected provider's family answers;
-      the other bands shape effort, thinking, length and personality.</p>
-
-      <p class="legal-h">Legal &amp; affiliation</p>
-      <p>ClaudeAmp is a from-scratch homage &mdash; <b>not affiliated with, endorsed by, or sponsored
-      by</b> Winamp, Nullsoft, or AOL, and using <b>no original skin assets</b> (every pixel of chrome
-      is hand-drawn). It is likewise not affiliated with Anthropic, OpenAI, Google, or YouTube; those
-      names and CLIs belong to their respective owners. Released under the <b>MIT License</b> and
-      provided <b>&ldquo;as is&rdquo;</b>, without warranty of any kind. Some interface icons are
-      <b>Font Awesome Free</b> (CC BY 4.0). Source:
-      <a href="https://github.com/petehottelet/claudeamp" target="_blank" rel="noopener">github.com/petehottelet/claudeamp</a>.</p>
-      <div class="w95-row"><button class="w95-btn" data-close>OK</button></div>
-    </div>
-  </div>
 
   <!-- ============================= ADD URL DIALOG ============================= -->
   <div class="w95-dialog" id="dlg-addtrack" hidden>
@@ -641,7 +603,40 @@
             <button class="eye" type="button" aria-label="Show or hide Gemini API key"><img alt="" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CiAgICAgIDxnIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzY0NzQ4YiIgc3Ryb2tlLXdpZHRoPSI0IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPgogICAgICA8cGF0aCBkPSJNOCAzMnM5LTE1IDI0LTE1IDI0IDE1IDI0IDE1LTkgMTUtMjQgMTVTOCAzMiA4IDMyWiIvPgogICAgICA8cGF0aCBkPSJNMjcgMjdhNyA3IDAgMCAwIDEwIDEwTTEwIDEwbDQ0IDQ0Ii8+CiAgICAgIDwvZz48L3N2Zz4="></button>
           </div>
         </div>
-        <div class="privacy"><a id="sm-legal">◈ More details, legal &amp; privacy</a></div>
+        <div class="privacy"><a id="sm-legal" role="button" aria-expanded="false" aria-controls="sm-legal-panel">◈ More details, legal &amp; privacy</a></div>
+        <!-- The details open in place, in this scrollable panel, rather
+             than in a separate dialog. -->
+        <div class="legal-panel" id="sm-legal-panel" tabindex="0" hidden>
+          <h3>Privacy &amp; your data</h3>
+          <p>ClaudeAmp has no backend of its own &mdash; it runs entirely in your browser (or the local
+          desktop shell) and collects <b>no analytics, no telemetry, and no accounts</b>. API keys you
+          enter stay on this machine &mdash; the desktop app encrypts them with <b>your OS keychain</b>,
+          a plain browser keeps them in <b>localStorage</b> &mdash; and are never sent to a
+          ClaudeAmp server (there isn't one), so use personal keys you can revoke and clear them any time
+          by emptying the fields and saving. When you pick an <b>API model</b> (Claude, OpenAI, Gemini)
+          your messages go straight from your browser to that provider, handled under its own terms and
+          privacy policy. When you pick a <b>subscription model</b> (Claude Code / Codex) no key is
+          needed: the desktop app relays chat to the <code>claude</code> / <code>codex</code> CLI already
+          installed on your machine over a <b>loopback-only</b> local bridge, and that CLI &mdash; not
+          ClaudeAmp &mdash; handles auth; <b>Ollama</b> models are likewise discovered from your
+          loopback-only local service. Music plays through YouTube's embedded IFrame player, so that
+          playback is subject to <b>YouTube's / Google's</b> terms and privacy policy.</p>
+          <h3>CLI workspace access</h3>
+          <p><b>Read only</b> is the safe default &mdash; the CLI can look but not touch. Enable <b>Allow
+          workspace edits</b> only when you want the selected CLI to create or change files in the
+          workspace folder you choose with <b>Workspace...</b>.</p>
+          <h3>The EQ</h3>
+          <p>The left <b>MODEL</b> slider chooses which model in the selected provider's family answers;
+          the other bands shape effort, thinking, length and personality.</p>
+          <h3>Legal &amp; affiliation</h3>
+          <p>ClaudeAmp is a from-scratch homage &mdash; <b>not affiliated with, endorsed by, or sponsored
+          by</b> Winamp, Nullsoft, or AOL, and using <b>no original skin assets</b> (every pixel of chrome
+          is hand-drawn). It is likewise not affiliated with Anthropic, OpenAI, Google, or YouTube; those
+          names and CLIs belong to their respective owners. Released under the <b>MIT License</b> and
+          provided <b>&ldquo;as is&rdquo;</b>, without warranty of any kind. Some interface icons are
+          <b>Font Awesome Free</b> (CC BY 4.0). Source:
+          <a href="https://github.com/petehottelet/claudeamp" target="_blank" rel="noopener">github.com/petehottelet/claudeamp</a>.</p>
+        </div>
       </section>
       </div>
       <div class="sm-tab-panel" data-panel="signin" hidden>

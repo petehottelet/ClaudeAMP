@@ -1318,14 +1318,20 @@
     saveConvos();
   }
 
-  // Animated "THINKING…" placeholder shown while the model reasons; its actual
-  // reasoning text is never rendered. Removed when the answer starts.
+  // Typing indicator: three pulsing dots in a bubble on the model's side of
+  // the conversation, shown for every provider from the moment a message is
+  // sent until the first token arrives (and again while a model that reports
+  // its reasoning is thinking - the reasoning itself is never rendered).
+  // Removed when the answer starts.
   let thinkingEl = null;
   function showThinking() {
     if (thinkingEl) return;
-    thinkingEl = msgDiv("thinking", "", "THINKING");
+    thinkingEl = msgDiv("thinking", "", "");
     const dots = document.createElement("span");
     dots.className = "think-dots";
+    dots.setAttribute("role", "status");
+    dots.setAttribute("aria-label", "Waiting for a reply");
+    for (let i = 0; i < 3; i++) dots.appendChild(document.createElement("i"));
     thinkingEl.appendChild(dots);
     chatLog.scrollTop = chatLog.scrollHeight;
   }
@@ -1355,6 +1361,7 @@
   function showOllamaWarmup() {
     warmupArm = null;
     if (warmupEl) return;
+    hideThinking(); // the load bar takes over from the dots until the model is up
     const est = Math.max(2500, currentOllamaSizeGB() * 1600); // ~1.6s per GB
     const start = performance.now();
     warmupEl = msgDiv("warmup", null, "");
@@ -1477,6 +1484,9 @@
     liveTurn = { in: 0, out: 0, model: model().id, demo: demoMode() };
     tw = twThink = null;
     const myGen = ++genSeq; // stale handlers from a stopped run must not fire
+    // Every provider: the dots appear the moment the message goes out, so
+    // the wait for a first token never looks like a dropped request.
+    showThinking();
 
     const rawHandlers = {
       onStart(u) { if (liveTurn) liveTurn.in = u.input || 0; },
@@ -2710,11 +2720,24 @@
     resetModernDrag("about-modern");
     ov.hidden = false;
   }
+  // "More details, legal & privacy" unfolds a scrollable panel in place
+  // (no dialog); it starts folded on every open.
+  const LEGAL_LINK_TEXT = "◈ More details, legal & privacy";
+  function toggleLegalPanel(open) {
+    const panel = $("sm-legal-panel"), link = $("sm-legal");
+    if (!panel || !link) return;
+    const show = open === undefined ? panel.hidden : !!open;
+    panel.hidden = !show;
+    link.textContent = show ? "◈ Hide details" : LEGAL_LINK_TEXT;
+    link.setAttribute("aria-expanded", show ? "true" : "false");
+    if (show) { panel.scrollTop = 0; panel.scrollIntoView({ block: "nearest" }); }
+  }
   function openSettings() {
     const ov = $("settings-modern");
     if (!ov) return;
     smShowTab("model"); // always open on the first tab
     mountClawMark("sm-icon");
+    toggleLegalPanel(false);
     const p = document.querySelector('input[name="sm-provider"][value="' + S.provider + '"]');
     if (p) p.checked = true;
     const wv = S.cliAccess === "workspace" ? "workspace" : "read-only";
@@ -2747,7 +2770,7 @@
       $("sm-claude-login").addEventListener("click", openClaudeLogin);
       $("sm-codex-login").addEventListener("click", openCodexLogin);
       $("sm-refresh").addEventListener("click", () => refreshBridgeStatus(true).then(renderSmInfo).catch(() => {}));
-      $("sm-legal").addEventListener("click", e => { e.preventDefault(); showDialog("dlg-legal"); });
+      $("sm-legal").addEventListener("click", e => { e.preventDefault(); toggleLegalPanel(); });
       document.querySelectorAll('input[name="sm-workspace"]').forEach(r =>
         r.addEventListener("change", () => {
           $("sm-shell").disabled = r.value !== "workspace" || !r.checked;
