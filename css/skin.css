@@ -246,6 +246,8 @@ html.mac .onboarding-arrow { left: auto; right: 4.5px; }
 .mac-shell .titlebar .tb-close { background: #FF5F57; order: -3; margin-left: 3px; }
 .mac-shell .titlebar .tb-min { background: #FEBC2E; order: -2; }
 .mac-shell .titlebar .tb-shade { background: #28C840; order: -1; }
+/* plain traffic lights: no minus / shade / X glyph inside the dots */
+.mac-shell .titlebar .tb-btn::after { display: none; }
 .mac-shell .titlebar .tb-menu { order: 10; margin: 0 4px 0 2px; }
 
 @keyframes menu-tip-bounce {
@@ -1609,7 +1611,6 @@ html.mac .onboarding-arrow { left: auto; right: 4.5px; }
 .saved-playlists .saved-row .saved-name,
 .jump-results .jump-row .jump-name { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; }
 .saved-playlists .saved-row .saved-count { flex: 0 0 auto; color: #B8B830; }
-.about-dialog { width: 320px; }
 /* (the old Win95 first-run dialog was replaced by the modern #welcome-modern
    overlay; .setup-choice styles below are kept only for w95-btn reuse) */
 .setup-lead { margin: 0 0 8px; font-size: 7px; line-height: 10px; }
@@ -1620,87 +1621,15 @@ html.mac .onboarding-arrow { left: auto; right: 4.5px; }
 .setup-choice b { display: block; font-size: 7px; line-height: 11px; margin-bottom: 4px; }
 .setup-choice span { display: block; font-size: 6px; line-height: 9px; color: #303030; white-space: normal; }
 
-.about-dialog .w95-body p, .about-dialog .w95-note { line-height: 10px; }
-.about-dialog .w95-body { text-align: center; }
-.about-deck {
-  position: relative;
-  height: 78px;
-  overflow: hidden;
-  margin-bottom: 8px;
-  padding: 8px 8px 6px 70px;
-  background-color: #020208;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' shape-rendering='crispEdges' width='3' height='3'%3E%3Crect width='1' height='1' fill='%23123016'/%3E%3C/svg%3E");
-  border: 1px solid;
-  border-color: #40405A #F0F1F8 #F0F1F8 #40405A;
-}
-.about-claw {
-  position: absolute;
-  left: 9px; top: 7px;
-  width: 54px; height: 54px;
-  background: url("../assets/claw-mark.png") center / contain no-repeat;
-}
-.about-wordmark {
-  color: var(--gold-hi);
-  font-size: 12px;
-  line-height: 14px;
-  text-shadow: 1px 1px 0 #6E3A08;
-}
-.about-version { color: #5A76B4; font-size: 6px; line-height: 8px; }
-.about-vu {
-  height: 23px;
-  display: flex;
-  align-items: flex-end;
-  gap: 2px;
-  padding-top: 3px;
-}
-.about-vu i {
-  display: block;
-  width: 4px;
-  height: 25%;
-  background: var(--lcd-green);
-  animation: about-meter 900ms steps(4, end) infinite alternate;
-}
-.about-vu i:nth-child(2n) { animation-delay: -180ms; }
-.about-vu i:nth-child(3n) { animation-delay: -360ms; background: #DEA518; }
-.about-vu i:nth-child(5n) { animation-delay: -540ms; background: #D05820; }
-.about-marquee {
-  color: var(--lcd-green);
-  font-size: 6px;
-  line-height: 8px;
-  white-space: nowrap;
-}
-@keyframes about-meter { from { height: 20%; } to { height: 100%; } }
-@media (prefers-reduced-motion: reduce) {
-  .about-vu i { animation: none; height: 65%; }
-}
-.about-logo {
-  display: block;
-  width: 250px;
-  max-width: 92%;
-  margin: 6px auto 2px;
-}
-/* The claw mark alone still fronts the Settings dialog (see openSettings). */
+/* The claw mark fronts the Settings, About, and welcome panels (see
+   mountClawMark in js/app.js). The About panel itself is a .modern-ui
+   overlay; its rules sit with the Settings ones below. */
 .about-mark {
   width: 110px;
   height: 110px;
   object-fit: contain;
   display: inline-block;
 }
-.about-url { text-align: center; margin: 4px 0 8px; }
-.about-url a {
-  font-family: var(--font-dot);
-  font-size: 7px;
-  color: #0000C6;
-}
-.about-credit {
-  padding: 4px;
-  border: 1px solid;
-  border-color: #808080 #FFFFFF #FFFFFF #808080;
-  background: #B8B8B8;
-  text-align: center;
-  line-height: 9px;
-}
-.about-credit a { color: #000080; }
 
 /* embed-check report readout */
 .embed-report {
@@ -1896,6 +1825,22 @@ html.mac .modern-ui .sm-tab:hover { background:rgba(255,255,255,.45); }
   .modern-ui .footer { padding:16px; }
   .modern-ui .ghost, .modern-ui .primary { flex:1; min-width:0; }
 }
+
+/* About: the same white panel as Settings, narrower, content centered */
+#about-modern .window { width:min(560px,96vw); }
+.modern-ui .about-hero { text-align:center; }
+.modern-ui .about-logo { display:block; width:min(300px,82%); margin:2px auto 14px; }
+.modern-ui .about-url { margin:0 0 10px; font-size:15px; }
+.modern-ui .about-url a, .modern-ui .about-credit a { color:#b0491f; font-weight:600; text-decoration:none; }
+.modern-ui .about-url a:hover, .modern-ui .about-credit a:hover { text-decoration:underline; }
+.modern-ui .about-tagline { margin:0 0 8px; font-size:15px; line-height:1.45; }
+.modern-ui .about-credit { text-align:center; }
+.modern-ui .about-credit p { margin:0; font-size:15px; }
+.modern-ui .about-credit p + p { margin-top:6px; }
+/* Settings and About move by their header (js/app.js makeModernDraggable) */
+.modern-ui .window.draggable .header { cursor:grab; user-select:none; touch-action:none; }
+.modern-ui .window.draggable.dragging .header { cursor:grabbing; }
+.modern-ui .window.draggable .header .close { cursor:pointer; }
 
 /* accessibility: screen-reader-only live region + a visible focus ring for
    the keyboard-operable sliders (the skin otherwise hides focus) */

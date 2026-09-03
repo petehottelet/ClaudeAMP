@@ -113,9 +113,10 @@ Terminal.app on macOS.
 The desktop app also wraps a genuine terminal in the skin chrome: the
 **CLAUDEAMP SHELL** window hosts a real PTY (PowerShell on Windows, your
 login shell on macOS) rendered by xterm.js in classic green-on-black, so you
-can run anything there — including `claude` itself. Pick **Mode: Real
-Terminal** in the menu (or on the welcome screen) and the shell replaces the
-chat window outright, auto-launching the CLI for your selected provider.
+can run anything there — including `claude` itself. Toggle **Terminal** in
+the menu (`Ctrl`/`Cmd+7`, or pick Real Terminal on the welcome screen) and the
+shell replaces the chat window outright, auto-launching the CLI for your
+selected provider.
 
 Tagged releases (`git tag v1.7.2 && git push origin v1.7.2`) build the installers
 automatically via GitHub Actions and attach them to the GitHub release, so
@@ -257,8 +258,9 @@ turns show $0), and a context-window meter.
   one-pixel seams. Drag any docked window to move its whole connected group;
   hold `Alt` while dragging to pull just one window away.
 - Double-click any titlebar to windowshade; right-click for the menu
-  (window toggles, models, zoom 1×–3×). The first launch defaults to 1.5×;
-  every scale stays on the pixel grid and nothing is anti-aliased.
+  (window toggles, models). Zoom 1×–3× lives in Settings → Display and on
+  `Ctrl`/`Cmd` `+`, `-`, and `0`; the first launch defaults to 1.5×, every
+  scale stays on the pixel grid and nothing is anti-aliased.
 - Clutterbar: `O`ptions, `A`bout, `I` LCD mode, `D` cycles 2×/4×/8×, `V` usage monitor.
 - Click the visualizer to cycle spectrum → oscilloscope → off.
 - Everything (layout, settings, keys, conversations, active and named playlists)

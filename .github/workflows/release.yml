@@ -16,11 +16,11 @@ permissions:
 
 # Publishing happens in exactly three cases: a v* tag push; a manual
 # dispatch that explicitly says publish=yes; or a release/** branch push
-# for a version whose release does not exist yet (electron-builder then
-# creates the v<version> tag and release itself). Everything else - and
-# any release/** push for an already-released version - builds as a dry
-# run, so the bytes of a published version can never be overwritten by
-# accident.
+# for a version that has not been promoted yet ('prepare' creates the
+# v<version> tag and prerelease, or replaces a prerelease an earlier run
+# left incomplete). Everything else - and any release/** push for an
+# already-promoted version - builds as a dry run, so the bytes of a
+# published version can never be overwritten by accident.
 jobs:
   # Installers build only after the platform verification matrix passes:
   # both macOS and Windows runners perform the full Electron/PTY proof.
@@ -49,9 +49,31 @@ jobs:
           if [ "$ELIGIBLE" = "true" ]; then
             version="$(node -p "require('./package.json').version")"
             tag="v$version"
-            if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-              echo "release $tag already exists - builds will be dry runs"
+            # isPrerelease: "false" = promoted (published for real); "true" =
+            # created by an earlier run that never reached verify-assets;
+            # "" = no release yet.
+            existing="$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" \
+              --json isPrerelease --jq .isPrerelease 2>/dev/null || true)"
+            if [ "$existing" = "false" ]; then
+              echo "release $tag is already published - builds will be dry runs"
             else
+              if [ "$existing" = "true" ]; then
+                # A prerelease is a release whose assets never all arrived
+                # (a build leg failed before verify-assets could promote it).
+                # /releases/latest has never pointed at it, so replace it -
+                # tag included - and rebuild every asset from this commit
+                # instead of stranding the version number.
+                echo "release $tag exists but was never promoted - replacing it from $GITHUB_SHA"
+                gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
+                for attempt in 1 2 3 4 5 6; do
+                  git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1 || break
+                  echo "waiting for tag $tag to be removed ($attempt)"; sleep 5
+                done
+                if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
+                  echo "tag $tag still exists - not re-creating the release on a stale commit" >&2
+                  exit 1
+                fi
+              fi
               # Prerelease until verify-assets confirms every installer is
               # attached: /releases/latest (install.sh, the website button)
               # must never point at a release whose assets are still building.

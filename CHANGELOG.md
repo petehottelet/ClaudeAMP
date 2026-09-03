@@ -13,16 +13,31 @@ the `package.json` version, which CI requires to agree with `js/version.js`.
   first focus loss (older builds masked it by re-arming on every shape
   report). The recompute is macOS-only now, and the Windows/Linux runner
   proves a blur never raises the ignore flag.
+- Release pipeline: a version whose first release run failed part-way
+  (1.7.5's own first attempt left a prerelease holding only the Windows
+  and Linux installers) is rebuilt and published in full on the next
+  release push instead of being stranded behind the "already released"
+  guard. Promoted releases stay immutable.
 
 ### Added
 - Settings has a Display tab with the desktop zoom (1x to 3x), the same
-  steps as the menu and the Cmd/Ctrl shortcuts.
+  steps as the Cmd/Ctrl shortcuts.
 
 ### Changed
 - The Welcome item is gone from the menus (in-app and the macOS menu bar);
   the welcome still runs on first launch, and Settings carries everything
   it sets.
-- Rain glyphs are 1.5x larger.
+- The main-window dropdown no longer lists Mode: AI Chat / Mode: Real
+  Terminal or the zoom steps: the Terminal item (Cmd/Ctrl+7) switches
+  modes, and zoom lives in Settings > Display and on Cmd/Ctrl +, -, and 0.
+  The macOS View menu keeps Actual Size, Zoom In, and Zoom Out.
+- About ClaudeAmp is the same white panel as Settings, and both Settings
+  and About can be dragged by their header.
+- Rain glyphs are 1.5x larger, and every glyph in a drip is drawn as a
+  solid green character (thicker strokes, slower fade) instead of thin
+  strokes that went black a few cells behind the head.
+- macOS: the three title-bar dots no longer carry the minus, shade, and X
+  glyphs.
 - Default playlist: tracks 22 and 24 swapped (The Lemonheads now at 22,
   Katrina & The Waves at 24). An existing playlist that is still exactly
   the bundled catalog follows the new order on next launch; edited

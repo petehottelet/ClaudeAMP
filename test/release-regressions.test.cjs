@@ -271,12 +271,17 @@ test("Rain and the playlist-style results scrollbar are release defaults", () =>
   assert.match(app, /visibleH \* RAIN_SCALE/);
   assert.match(app, /if \(rain\) buildRain\(rainState\)/);
   // The rain is the 1.5.1 original restored verbatim at the owner's
-  // request - with one later owner change: glyph cells at 1.5x (9 logical
-  // px, was 6). Pacing (5.6 cells/second) and the 0.034/frame persistence
-  // fade stay original. Do not "improve" it again.
+  // request - with two later owner changes: glyph cells at 1.5x (9 logical
+  // px, was 6), and trail glyphs stamped as solid green characters (1.8x
+  // stroke weight, rgb(0,230,0)) over a 0.016/frame persistence fade (was
+  // thin rgb(0,150,0) strokes at 0.034, which went black a few cells behind
+  // the head). Pacing (5.6 cells/second) stays original. Do not "improve"
+  // it again.
   assert.match(app, /cell = 9 \* RAIN_SCALE/);
   assert.match(app, /GLYPHS\.speeds\[g\] \* 5\.6/);
-  assert.match(app, /rgba\(0,0,0,0\.034\)/);
+  assert.match(app, /rgba\(0,0,0,0\.016\)/);
+  assert.match(app, /rainGlyphPath\(ctx, g, pad, pad, cell, "rgb\(0,230,0\)", 1\.8\)/);
+  assert.match(app, /s\[s\.length - 1\] \* sx \* weight/);
   assert.doesNotMatch(app, /RAINW\s*=|RAINH\s*=/);
   assert.match(html, /id="mb-results-scroll"/);
   assert.match(app, /attachAmpScroll\(\$\("yt-results"\),\s*\$\("mb-results-scroll"\),\s*28\)/);
@@ -287,10 +292,26 @@ test("Rain and the playlist-style results scrollbar are release defaults", () =>
 test("half-step zoom options remain available", () => {
   assert.match(app, /zoom:\s*1\.5/);
   assert.match(app, /if \(!s\) S\.zoom = 1\.5/);
-  assert.match(app, /Zoom 1\.5x/);
+  assert.match(html, /name="sm-zoom"[^>]*value="1\.5"/);
   assert.match(app, /setZoom\(1\.5\)/);
-  assert.match(app, /Zoom 2\.5x/);
+  assert.match(html, /name="sm-zoom"[^>]*value="2\.5"/);
   assert.match(app, /setZoom\(2\.5\)/);
+});
+
+test("About is a modern overlay and the modern panels drag by their header", () => {
+  assert.match(html, /id="about-modern" class="modern-ui"/);
+  assert.doesNotMatch(html, /id="dlg-about"/);
+  assert.doesNotMatch(css, /\.about-dialog/);
+  assert.match(html, /id="about-version"/);
+  assert.match(app, /"about":\s*openAbout/);
+  assert.match(app, /act === "about"\) openAbout\(\)/);
+  assert.doesNotMatch(app, /showDialog\("dlg-about"\)/);
+  assert.match(app, /makeModernDraggable\("settings-modern"\)/);
+  assert.match(app, /makeModernDraggable\("about-modern"\)/);
+  assert.match(css, /\.modern-ui \.window\.draggable \.header\s*\{[^}]*cursor:\s*grab/);
+  assert.match(proofs, /settingsWindowDraggable/);
+  // macOS traffic lights carry no minus / shade / X glyphs.
+  assert.match(css, /\.mac-shell \.titlebar \.tb-btn::after\s*\{\s*display:\s*none/);
 });
 
 test("main menu is text-only with right-aligned state marks and footer account actions", () => {
@@ -308,6 +329,13 @@ test("main menu is text-only with right-aligned state marks and footer account a
   // either rendering (owner's call). Settings carries everything it set.
   assert.doesNotMatch(mainMenu, /"Welcome"/);
   assert.doesNotMatch(read("js/menu-spec.js"), /id:\s*"welcome"/);
+  // The Mode rows and the zoom steps left the dropdown too (owner's call):
+  // the Terminal check switches modes, and zoom lives in Settings > Display
+  // and on the Cmd/Ctrl shortcuts, which the View menu keeps.
+  assert.doesNotMatch(menuItems, /Mode: /);
+  assert.doesNotMatch(menuItems, /label: "Zoom /);
+  assert.doesNotMatch(read("js/menu-spec.js"), /group:\s*"(mode|zoom)"/);
+  assert.match(read("js/menu-spec.js"), /id: "zoom-1", label: "Actual Size", accelerator: "CmdOrCtrl\+0"/);
   assert.match(html, /data-tab="display"/);
   assert.equal((html.match(/name="sm-zoom"/g) || []).length, 5);
   assert.match(app, /input\[name="sm-zoom"\]:checked/);
