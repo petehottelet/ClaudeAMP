@@ -92,6 +92,12 @@ test("shape reports never re-ignore the window, and nothing pauses the poll", ()
     "macPollArmsInOneTick", "macPollFollowsRealCursor", "macNativeIgnoreDropsClick"])
     assert.match(proofs, new RegExp(name));
   assert.match(main, /setMacCursor\(point\)/);
+  // The held pin comes from pointer events (mouse events are suppressed
+  // for the whole press once a slider/grip cancels pointerdown under
+  // pointer capture); dragend releases it; only a window exit disarms.
+  for (const type of ["pointerdown", "pointerup", "pointercancel", "dragend"])
+    assert.match(native, new RegExp(`addEventListener\\("${type}"`));
+  assert.match(native, /e\.target === document\.documentElement\) apply\(false\)/);
   assert.match(main, /stepMacPoll\(\) \{ return macPollOnce\(\); \}/);
   // Report storm: the ticker wrote `hidden` every frame (a same-value
   // assignment still queues a mutation record), and native.js re-sent an
