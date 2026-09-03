@@ -1777,7 +1777,6 @@
     ] : [];
 
     openMenu([
-      { label: "Welcome", fn: () => runMenuCommand("welcome") },
       { label: "Settings", id: "settings", fn: () => runMenuCommand("settings"), ...guided("settings") },
       { label: "About ClaudeAmp...", fn: () => runMenuCommand("about") },
       "-",
@@ -2674,6 +2673,8 @@
     $("sm-choose-workspace").disabled = !window.claudeAmpDesktop;
     const m = document.querySelector('input[name="sm-music"][value="' + (S.musicService || "itunes") + '"]');
     if (m) m.checked = true;
+    const z = document.querySelector('input[name="sm-zoom"][value="' + S.zoom + '"]');
+    if (z) z.checked = true;
     const smSpotifyId = $("sm-spotify-client");
     if (smSpotifyId) smSpotifyId.value = S.spotifyClientId || "";
     refreshSpotifyUi("sm");
@@ -2732,6 +2733,8 @@
     if (m) S.musicService = m.value;
     const smSpotify = $("sm-spotify-client");
     if (smSpotify && smSpotify.value.trim()) S.spotifyClientId = smSpotify.value.trim();
+    const z = document.querySelector('input[name="sm-zoom"]:checked');
+    if (z && ZOOM_STEPS.includes(Number(z.value)) && Number(z.value) !== S.zoom) setZoom(Number(z.value));
     saveSettings();
     syncMusicService();
     closeSettings();
@@ -3508,7 +3511,9 @@
     // The backing follows the stage at exactly RAIN_SCALE on both axes. Cells
     // therefore remain six logical pixels tall regardless of the window's
     // aspect ratio; a larger stage gets more backing pixels and more lanes.
-    const cell = 6 * RAIN_SCALE, pad = 3 * RAIN_SCALE;
+    // 1.5x the 1.5.1 glyph size at the owner's request (6 -> 9 logical px
+    // cells); everything else about the rain stays the 1.5.1 original.
+    const cell = 9 * RAIN_SCALE, pad = 5 * RAIN_SCALE;
     const W = fxCanvas.width, H = fxCanvas.height;
     const gw = cell * GLYPHS.canvas[0] / GLYPHS.canvas[1];
     const size = { w: Math.ceil(gw) + pad * 2, h: cell + pad * 2 };

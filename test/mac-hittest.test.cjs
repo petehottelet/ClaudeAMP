@@ -113,6 +113,12 @@ test("shape reports never re-ignore the window, and nothing pauses the poll", ()
   assert.match(main, /!win\.isMinimized\(\)\)\s*\{/);
   assert.match(main, /app\.on\("did-become-active", \(\) => macKick\(\)\)/);
   assert.match(main, /app\.on\("browser-window-focus", \(\) => macKick\(\)\)/);
+  // Off macOS the native region is clipped by setShape and the window must
+  // never ignore the mouse; the 'blur' handler's recompute is a no-op there
+  // (1.7.4 flipped Windows to ignore-mouse on the first focus loss).
+  assert.match(main, /function macSetIgnore\(on\) \{[\s\S]{0,700}if \(process\.platform !== "darwin"\) return;/);
+  assert.match(main, /function macRecompute\(\) \{\s*if \(process\.platform !== "darwin"\) return;/);
+  assert.match(proofs, /nativeWindowNeverIgnoresMouse/);
   // powerSaveBlocker("prevent-app-suspension") is a no-idle-sleep assertion
   // on macOS (keeps the Mac awake) and does nothing for App Nap: gone.
   assert.doesNotMatch(main, /powerSaveBlocker/);

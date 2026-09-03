@@ -4,6 +4,26 @@ Notable changes to ClaudeAmp. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 the `package.json` version, which CI requires to agree with `js/version.js`.
 
+## [1.7.5] - 2026-09-03
+
+### Fixed
+- Windows: clicks work again after the app loses and regains focus.
+  1.7.4's window-blur handler reached the macOS click-through recompute on
+  every platform and told the Windows window to ignore the mouse on the
+  first focus loss (older builds masked it by re-arming on every shape
+  report). The recompute is macOS-only now, and the Windows/Linux runner
+  proves a blur never raises the ignore flag.
+
+### Added
+- Settings has a Display tab with the desktop zoom (1x to 3x), the same
+  steps as the menu and the Cmd/Ctrl shortcuts.
+
+### Changed
+- The Welcome item is gone from the menus (in-app and the macOS menu bar);
+  the welcome still runs on first launch, and Settings carries everything
+  it sets.
+- Rain glyphs are 1.5x larger.
+
 ## [1.7.4] - 2026-09-03
 
 ### Fixed
