@@ -54,8 +54,8 @@ screen: pick your model provider and access method (subscription CLI, API
 key, or local Ollama), paste a key if that path needs one, then choose
 whether the main window is the AI chat or a **real terminal** that
 auto-runs the CLI for the provider you picked (Claude Code, Codex, or
-`ollama run`). Everything the welcome screen sets — and the screen
-itself — stays reachable from the main-window hamburger menu.
+`ollama run`). Everything the welcome screen sets stays editable in
+**Settings** (main-window hamburger menu), including the desktop zoom.
 Use **Options** to choose read-only or workspace access and the folder Claude
 Code/Codex may work in. Read-only is the default and really is read-only
 (the CLI gets no edit, write, or shell tools). Workspace mode allows edits

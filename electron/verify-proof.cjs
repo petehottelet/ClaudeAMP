@@ -316,6 +316,22 @@ async function runVerifyProof(window) {
 
     if (process.platform === "win32" || process.platform === "linux") {
       check("nativeShapeApplied", !ctx.shapeApplyError, ctx.shapeApplyError);
+      // The window must never be told to ignore the mouse off macOS: the
+      // 1.7.4 regression was the 'blur' handler reaching the mac recompute
+      // on Windows, which stopped every click after the first focus loss.
+      // Emit a blur through the real handler and spy the native call.
+      const ignoreCalls = [];
+      const realSetIgnore = window.setIgnoreMouseEvents.bind(window);
+      window.setIgnoreMouseEvents = (on, opts) => { ignoreCalls.push(!!on); return realSetIgnore(on, opts); };
+      try {
+        window.emit("blur");
+        await wait(50);
+        await window.webContents.executeJavaScript(
+          `window.claudeampNative.updateShape(${JSON.stringify(ctx.lastShape)})`);
+        await wait(150);
+      } finally { window.setIgnoreMouseEvents = realSetIgnore; }
+      check("nativeWindowNeverIgnoresMouse", !ignoreCalls.includes(true) && ctx.macIgnoring === false,
+        { ignoreCalls, ignoring: ctx.macIgnoring });
     }
     if (process.platform === "darwin") {
       // Freeze the cursor poll: the runner's mouse sits wherever it sits, and

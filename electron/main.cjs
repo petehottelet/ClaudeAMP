@@ -160,11 +160,19 @@ let macKickWired = false;      // activation/focus listeners registered once
 let macCursorOverride = null;  // verify proofs: a fake cursor point for the poll
 let macPollOnce = () => macHittest.FAR_MS; // one poll decision (set by startMacHitTester)
 function macSetIgnore(on) {
+  // macOS only. On Windows/Linux setShape clips the native region and the
+  // window must never ignore the mouse: through 1.7.4 the window 'blur'
+  // handler reached macRecompute on every platform and, with all three mac
+  // signals false, flipped Windows to ignore-mouse on the first focus loss.
+  // Older builds masked that by re-running setIgnoreMouseEvents(false) on
+  // every shape report; the one-shot arming exposed it.
+  if (process.platform !== "darwin") return;
   if (!win || win.isDestroyed() || on === macIgnoring) return;
   macIgnoring = on;
   win.setIgnoreMouseEvents(on, { forward: true });
 }
 function macRecompute() {
+  if (process.platform !== "darwin") return;
   macSetIgnore(!(macHeld || macRendererOver || macPollOver));
 }
 // Decide for a SCREEN point against the reported panel rects. Cursor point,
@@ -478,7 +486,8 @@ function createWindow(port) {
   });
   win.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
   win.once("ready-to-show", () => { readyToShow = true; maybeShow(); });
-  // Losing focus mid-drag would otherwise leave macHeld pinned true forever.
+  // Losing focus mid-drag would otherwise leave macHeld pinned true forever
+  // (macRecompute is a no-op off macOS; see macSetIgnore).
   win.on("blur", () => { macHeld = false; macRecompute(); });
   win.on("closed", () => { win = null; });
   win.loadURL("http://127.0.0.1:" + port + "/");

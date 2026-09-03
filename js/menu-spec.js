@@ -16,7 +16,6 @@ var CLAUDEAMP_MENU = [
   { menu: "app", items: [
     { id: "about", label: "About ClaudeAmp…" },
     { type: "separator" },
-    { id: "welcome", label: "Welcome" },
     { id: "settings", label: "Settings…", accelerator: "CmdOrCtrl+," },
   ] },
   { menu: "File", items: [

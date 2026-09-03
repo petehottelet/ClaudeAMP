@@ -25,7 +25,7 @@ const radio = read("js/radio.js");
 
 test("release version agrees across package, lockfile, and UI", () => {
   const uiVersion = versionSource.match(/CLAUDEAMP_VERSION\s*=\s*"([^"]+)"/)?.[1];
-  assert.equal(pkg.version, "1.7.4");
+  assert.equal(pkg.version, "1.7.5");
   assert.equal(lock.version, pkg.version);
   assert.equal(lock.packages[""].version, pkg.version);
   assert.equal(uiVersion, pkg.version);
@@ -264,10 +264,11 @@ test("Rain and the playlist-style results scrollbar are release defaults", () =>
   assert.match(app, /visibleW \* RAIN_SCALE/);
   assert.match(app, /visibleH \* RAIN_SCALE/);
   assert.match(app, /if \(rain\) buildRain\(rainState\)/);
-  // The rain is the 1.5.1 original, restored verbatim at the owner's
-  // request: 6-logical-px cells, the original 5.6 cells/second pacing,
-  // and the 0.034/frame persistence fade. Do not "improve" it again.
-  assert.match(app, /cell = 6 \* RAIN_SCALE/);
+  // The rain is the 1.5.1 original restored verbatim at the owner's
+  // request - with one later owner change: glyph cells at 1.5x (9 logical
+  // px, was 6). Pacing (5.6 cells/second) and the 0.034/frame persistence
+  // fade stay original. Do not "improve" it again.
+  assert.match(app, /cell = 9 \* RAIN_SCALE/);
   assert.match(app, /GLYPHS\.speeds\[g\] \* 5\.6/);
   assert.match(app, /rgba\(0,0,0,0\.034\)/);
   assert.doesNotMatch(app, /RAINW\s*=|RAINH\s*=/);
@@ -297,7 +298,13 @@ test("main menu is text-only with right-aligned state marks and footer account a
   assert.ok(menuItems.indexOf("...accountItems") < menuItems.indexOf('{ label: "Quit ClaudeAmp"'));
   // Both menu renderings dispatch through one command map, and the
   // preload carries the two menu channels.
-  assert.match(mainMenu, /runMenuCommand\("welcome"\)/);
+  // The welcome runs on first launch only; it is no longer a menu item in
+  // either rendering (owner's call). Settings carries everything it set.
+  assert.doesNotMatch(mainMenu, /"Welcome"/);
+  assert.doesNotMatch(read("js/menu-spec.js"), /id:\s*"welcome"/);
+  assert.match(html, /data-tab="display"/);
+  assert.equal((html.match(/name="sm-zoom"/g) || []).length, 5);
+  assert.match(app, /input\[name="sm-zoom"\]:checked/);
   assert.match(preload, /onMenuCommand/);
   assert.match(preload, /setMenuState/);
 });
