@@ -162,6 +162,12 @@ test("Bosstones are removed, Mustard Plug is track 33, and radio charts use Bad 
   const defaults = [...player.matchAll(/^\s+applePreview\(\d+,\s*"([^"]+)"\),?$/gm)].map(match => match[1]);
   assert.equal(defaults.length, 50);
   assert.equal(defaults[32], "Mustard Plug - Mr. Smiley");
+  // Owner's reorder: tracks 22 and 24 swapped. Stored playlists that are
+  // still exactly the bundled catalog follow the current order on load.
+  assert.equal(defaults[21], "The Lemonheads - It's A Shame About Ray");
+  assert.equal(defaults[23], "Katrina & The Waves - Walking On Sunshine");
+  assert.match(player, /const storedTracks = followDefaultOrder\(migrated\)/);
+  assert.match(player, /followDefaultOrder\(replaceBosstones\(playlist\.tracks\)\)/);
   assert.match(player, /replaceBosstones\(cloneTracks\(data\.tracks\)\)/);
 });
 
