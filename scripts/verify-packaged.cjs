@@ -39,6 +39,13 @@ if (!report) {
 }
 if (!report.ok || (report.failures && report.failures.length)) {
   console.error("[verify-packaged] FAIL: " + (report.failures || ["unknown"]).join(", "));
+  // Each failing check's detail first: the report is long and the head
+  // below is capped, so a failure's evidence used to fall off the end.
+  for (const name of report.failures || []) {
+    const detail = report[name + "Detail"];
+    console.error("[verify-packaged] " + name + " detail: " +
+      (detail === undefined ? "(none)" : JSON.stringify(detail).slice(0, 2000)));
+  }
   console.error(JSON.stringify(report, null, 2).slice(0, 4000));
   process.exit(1);
 }

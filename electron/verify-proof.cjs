@@ -394,35 +394,53 @@ async function runVerifyProof(window) {
       const ignoreCalls = [];
       const realSetIgnore = window.setIgnoreMouseEvents.bind(window);
       window.setIgnoreMouseEvents = (on, opts) => { ignoreCalls.push(!!on); return realSetIgnore(on, opts); };
-      const churn = { reports: 0, sawIgnore: false, pollRestarted: false };
+      const churn = { reports: 0, sawIgnore: false, pollRestarted: false, elapsedMs: 0, timeline: [] };
       try {
         ctx.setMacState({ rendererOver: false, pollOver: true, held: false });
         const rev0 = ctx.shapeRevision;
+        const t0 = Date.now();
         await window.webContents.executeJavaScript(`(() => { let n = 0; const id = setInterval(() => {
           WM.moveDockGroup('win-main', (n & 1) ? -1 : 1, 0, false);
           document.body.classList.toggle('verify-churn');
           if (++n >= 40) clearInterval(id); }, 50); })()`);
-        for (let i = 0; i < 100; i++) {
+        // Sample until the 40 moves have all reported or 6s pass: the
+        // packaged app on a hosted runner can stall its renderer for a
+        // couple of seconds, and a fixed window then under-counts reports
+        // that arrive late. The invariant (never re-ignored) is checked on
+        // every sample regardless of pace.
+        let last = -1;
+        for (let i = 0; i < 240; i++) {
           await wait(25);
           if (ctx.macIgnoring !== false) { churn.sawIgnore = true; break; }
           if (ctx.macPollRunning) { churn.pollRestarted = true; break; }
+          const delta = ctx.shapeRevision - rev0;
+          if (delta !== last) { churn.timeline.push([Date.now() - t0, delta]); last = delta; }
+          if (delta >= 40 && Date.now() - t0 >= 2100) break;
         }
+        churn.elapsedMs = Date.now() - t0;
         churn.reports = ctx.shapeRevision - rev0;
         churn.ignoreCalls = ignoreCalls.slice();
+        churn.timeline = churn.timeline.slice(-12);
       } finally { window.setIgnoreMouseEvents = realSetIgnore; }
       check("macRestingCursorSurvivesReports", !churn.sawIgnore && !churn.pollRestarted &&
         !ignoreCalls.includes(true) && churn.reports >= 15, churn);
       // Unchanged shapes are not re-sent: class-only churn for ~900ms may
       // produce the forced 1s resend and a trailing frame, nothing more.
-      await wait(100);
+      // Start only once the report stream has settled (no revision change
+      // for 300ms), so a late backlog from the moves above is not counted.
       {
+        let settledAt = ctx.shapeRevision, quiet = 0;
+        for (let i = 0; i < 120 && quiet < 12; i++) {
+          await wait(25);
+          if (ctx.shapeRevision === settledAt) quiet++; else { settledAt = ctx.shapeRevision; quiet = 0; }
+        }
         const rev0 = ctx.shapeRevision;
         await window.webContents.executeJavaScript(`(() => { let n = 0; const id = setInterval(() => {
           document.body.classList.toggle('verify-churn');
           if (++n >= 18) clearInterval(id); }, 50); })()`);
         await wait(950);
         check("macUnchangedShapeNotResent", ctx.shapeRevision - rev0 <= 2,
-          { reports: ctx.shapeRevision - rev0 });
+          { reports: ctx.shapeRevision - rev0, settledQuietSamples: quiet });
       }
 
       // The renderer hit-test arms and disarms through the real forwarded
