@@ -83,6 +83,16 @@ test("shape reports never re-ignore the window, and nothing pauses the poll", ()
   assert.equal((main.match(/macSetIgnore\(true\)/g) || []).length, 1,
     "macSetIgnore(true) may appear only in the one-shot first-show arming");
   assert.match(proofs, /macShapeReportKeepsInteractive/);
+  // The mac runner also exercises: sustained churn under a setIgnoreMouseEvents
+  // spy, the renderer hit-test path, an overflowing popup, the single-stepped
+  // poll under a controlled cursor, and (capability-gated, reported) real
+  // HID events against the NSWindow flag itself.
+  for (const name of ["macRestingCursorSurvivesReports", "macUnchangedShapeNotResent",
+    "macRendererHitTestArms", "macPopupInNativeShape", "macPollParkedOnGapIgnores",
+    "macPollArmsInOneTick", "macPollFollowsRealCursor", "macNativeIgnoreDropsClick"])
+    assert.match(proofs, new RegExp(name));
+  assert.match(main, /setMacCursor\(point\)/);
+  assert.match(main, /stepMacPoll\(\) \{ return macPollOnce\(\); \}/);
   // Report storm: the ticker wrote `hidden` every frame (a same-value
   // assignment still queues a mutation record), and native.js re-sent an
   // unchanged shape on each; both ends now only act on real change.
@@ -95,8 +105,8 @@ test("shape reports never re-ignore the window, and nothing pauses the poll", ()
   assert.match(main, /backgroundThrottling:\s*false/);
   assert.doesNotMatch(main, /win\.isVisible\(\)\)\s*\{[\s\S]{0,80}getCursorScreenPoint/);
   assert.match(main, /!win\.isMinimized\(\)\)\s*\{/);
-  assert.match(main, /app\.on\("did-become-active", kick\)/);
-  assert.match(main, /app\.on\("browser-window-focus", kick\)/);
+  assert.match(main, /app\.on\("did-become-active", \(\) => macKick\(\)\)/);
+  assert.match(main, /app\.on\("browser-window-focus", \(\) => macKick\(\)\)/);
   // powerSaveBlocker("prevent-app-suspension") is a no-idle-sleep assertion
   // on macOS (keeps the Mac awake) and does nothing for App Nap: gone.
   assert.doesNotMatch(main, /powerSaveBlocker/);

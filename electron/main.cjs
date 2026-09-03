@@ -156,6 +156,9 @@ let macHeld = false;           // renderer: a mouse button is held down
 let macPollOver = false;       // main poll: cursor inside a shape rect
 let macArmed = false;          // first-show arming done (one-shot, see maybeShow)
 let macKick = () => {};        // re-runs the cursor poll now (set by startMacHitTester)
+let macKickWired = false;      // activation/focus listeners registered once
+let macCursorOverride = null;  // verify proofs: a fake cursor point for the poll
+let macPollOnce = () => macHittest.FAR_MS; // one poll decision (set by startMacHitTester)
 function macSetIgnore(on) {
   if (!win || win.isDestroyed() || on === macIgnoring) return;
   macIgnoring = on;
@@ -200,14 +203,16 @@ function startMacHitTester() {
         JSON.stringify(entry) + "\n", () => {});
     } catch (_) {}
   };
-  const tick = () => {
+  // One decision, returned cadence. Split from the timer so the proofs can
+  // single-step it under a controlled cursor (macCursorOverride).
+  const pollOnce = () => {
     let cadence = macHittest.FAR_MS;
     // Not gated on win.isVisible(): Electron's macOS implementation compares
     // the occlusion state with == against a bit flag and only reads true
     // by accident. A false reading here would freeze the decision forever.
     if (win && !win.isDestroyed() && !win.isMinimized()) {
       try {
-        const p = screen.getCursorScreenPoint();
+        const p = macCursorOverride || screen.getCursorScreenPoint();
         // The halo grows with cursor speed: a flick covers several fixed
         // halos between two polls, and clicks are never forwarded while
         // ignoring, so a fast approach must pre-arm from further out.
@@ -223,8 +228,10 @@ function startMacHitTester() {
       } catch (_) { macPollOver = false; }
       macRecompute();
     }
-    macPoll = setTimeout(tick, cadence);
+    return cadence;
   };
+  macPollOnce = pollOnce;
+  const tick = () => { macPoll = setTimeout(tick, pollOnce()); };
   // Re-decide NOW instead of waiting out the cadence: on a new shape report
   // (a panel may have appeared under a resting cursor), when the app
   // becomes active, and when the window gains focus. No-op while a proof
@@ -236,8 +243,11 @@ function startMacHitTester() {
     macPoll = setTimeout(tick, 0);
   };
   macKick = kick;
-  app.on("did-become-active", kick);
-  app.on("browser-window-focus", kick);
+  if (!macKickWired) {
+    macKickWired = true;
+    app.on("did-become-active", () => macKick());
+    app.on("browser-window-focus", () => macKick());
+  }
   macPoll = setTimeout(tick, macHittest.FAR_MS);
 }
 
@@ -300,6 +310,10 @@ const { runVerifyProof, runSmokeProof } = createProofs({
   get macIgnoring() { return macIgnoring; },
   get bridge() { return bridge; },
   freezeMacPoll() { if (macPoll) { clearTimeout(macPoll); macPoll = null; } },
+  get macPollRunning() { return !!macPoll; },
+  setMacCursor(point) { macCursorOverride = point || null; },
+  stepMacPoll() { return macPollOnce(); },
+  resumeMacPoll() { startMacHitTester(); },
   setMacState(partial) {
     if ("rendererOver" in partial) macRendererOver = partial.rendererOver;
     if ("pollOver" in partial) macPollOver = partial.pollOver;

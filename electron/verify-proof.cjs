@@ -15,6 +15,91 @@ const { loginShellArgs, isRealTerminalBackend } = require("./terminal-platform.c
 
 module.exports = function createProofs(ctx) {
 
+// See the "Real HID events" block in runVerifyProof. Returns a report
+// object; only when a positive control succeeds does it register checks.
+async function macRealEventProbe(ctx, window, bounds, rect, gapFar, target, check) {
+  const report = { helper: "unavailable" };
+  if (!rect || !gapFar || !target) { report.helper = "skipped: no gap/rect/target"; return report; }
+  const { execFileSync } = require("child_process");
+  let dir;
+  try {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), "claudeamp-hid-"));
+    const src = path.join(dir, "hid.swift"), bin = path.join(dir, "hid");
+    fs.writeFileSync(src, [
+      "import Foundation",
+      "import CoreGraphics",
+      "let a = CommandLine.arguments",
+      "let p = CGPoint(x: Double(a[2])!, y: Double(a[3])!)",
+      "if a[1] == \"warp\" { CGWarpMouseCursorPosition(p); exit(0) }",
+      "if a[1] == \"click\" {",
+      "  let d = CGEvent(mouseEventSource: nil, mouseType: .leftMouseDown, mouseCursorPosition: p, mouseButton: .left)",
+      "  let u = CGEvent(mouseEventSource: nil, mouseType: .leftMouseUp, mouseCursorPosition: p, mouseButton: .left)",
+      "  d?.post(tap: .cghidEventTap); usleep(40000); u?.post(tap: .cghidEventTap); exit(0)",
+      "}",
+      "exit(2)",
+      "",
+    ].join("\n"));
+    execFileSync("swiftc", ["-O", "-o", bin, src], { timeout: 180000, stdio: "pipe" });
+    const hid = (...args) => {
+      try { execFileSync(bin, args.map(String), { timeout: 10000, stdio: "pipe" }); return true; }
+      catch (_) { return false; }
+    };
+    report.helper = "compiled";
+    // Cursor control: warp to the gap and read it back through Electron.
+    const gapScreen = { x: bounds.x + gapFar.x, y: bounds.y + gapFar.y };
+    hid("warp", gapScreen.x, gapScreen.y);
+    await wait(80);
+    const seen = ctx.screen.getCursorScreenPoint();
+    report.cursorControl = Math.abs(seen.x - gapScreen.x) <= 2 && Math.abs(seen.y - gapScreen.y) <= 2;
+    report.cursorSeen = seen;
+    report.cursorWanted = gapScreen;
+    if (report.cursorControl) {
+      ctx.setMacCursor(null);
+      ctx.setMacState({ rendererOver: false, pollOver: false, held: false });
+      ctx.resumeMacPoll();
+      await wait(150);
+      const onGap = ctx.macIgnoring;
+      hid("warp", bounds.x + rect.x + 2, bounds.y + rect.y + 2);
+      await wait(150);
+      const onPanel = ctx.macIgnoring;
+      ctx.freezeMacPoll();
+      check("macPollFollowsRealCursor", onGap === true && onPanel === false, { onGap, onPanel });
+    }
+    // Real click: positive control (interactive) first, then the negative
+    // (ignoring must drop the click). The click is posted at the position
+    // the positive control left the cursor on, so no mouseMoved is
+    // generated - a real move would be forwarded and arm the renderer,
+    // masking the flag.
+    const lit = () => window.webContents.executeJavaScript(
+      "document.getElementById('eq-on').classList.contains('lit')");
+    const clickScreen = { x: bounds.x + target.x, y: bounds.y + target.y };
+    ctx.setMacState({ rendererOver: true, pollOver: false, held: false });
+    await wait(60);
+    const before = await lit();
+    hid("click", clickScreen.x, clickScreen.y);
+    await wait(350);
+    report.clickInjection = (await lit()) !== before;
+    if (report.clickInjection) {
+      hid("click", clickScreen.x, clickScreen.y); // restore the toggle
+      await wait(350);
+      ctx.setMacState({ rendererOver: false, pollOver: false, held: false });
+      await wait(120);
+      const heldIgnore = ctx.macIgnoring === true;
+      const b2 = await lit();
+      hid("click", clickScreen.x, clickScreen.y);
+      await wait(350);
+      const a2 = await lit();
+      check("macNativeIgnoreDropsClick", heldIgnore && a2 === b2,
+        { heldIgnore, before: b2, after: a2, ignoring: ctx.macIgnoring });
+    }
+  } catch (error) {
+    report.error = String((error && error.message) || error).slice(0, 300);
+  } finally {
+    if (dir) { try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {} }
+  }
+  return report;
+}
+
 async function runVerifyProof(window) {
   const v = { platform: process.platform, ok: false, failures: [] };
   const check = (name, pass, detail) => {
@@ -282,10 +367,127 @@ async function runVerifyProof(window) {
         `window.claudeampNative.updateShape(${JSON.stringify(ctx.lastShape)})`);
       for (let i = 0; i < 20 && ctx.shapeRevision === revisionBefore; i++) await wait(25);
       check("macShapeReportKeepsInteractive",
-        ctx.shapeRevision > revisionBefore && ctx.macIgnoring === false,
-        { revisionBefore, revisionAfter: ctx.shapeRevision, ignoring: ctx.macIgnoring });
+        ctx.shapeRevision > revisionBefore && ctx.macIgnoring === false && !ctx.macPollRunning,
+        { revisionBefore, revisionAfter: ctx.shapeRevision, ignoring: ctx.macIgnoring,
+          pollRunning: ctx.macPollRunning });
+
+      // Sustained churn under a spy: while the signals say interactive the
+      // window may NEVER be told to ignore the mouse, however many changed
+      // shapes (real panel moves) and forced resends arrive. The spy sees
+      // even a transient true that a restarted poll would undo at once.
+      const ignoreCalls = [];
+      const realSetIgnore = window.setIgnoreMouseEvents.bind(window);
+      window.setIgnoreMouseEvents = (on, opts) => { ignoreCalls.push(!!on); return realSetIgnore(on, opts); };
+      const churn = { reports: 0, sawIgnore: false, pollRestarted: false };
+      try {
+        ctx.setMacState({ rendererOver: false, pollOver: true, held: false });
+        const rev0 = ctx.shapeRevision;
+        await window.webContents.executeJavaScript(`(() => { let n = 0; const id = setInterval(() => {
+          WM.moveDockGroup('win-main', (n & 1) ? -1 : 1, 0, false);
+          document.body.classList.toggle('verify-churn');
+          if (++n >= 40) clearInterval(id); }, 50); })()`);
+        for (let i = 0; i < 100; i++) {
+          await wait(25);
+          if (ctx.macIgnoring !== false) { churn.sawIgnore = true; break; }
+          if (ctx.macPollRunning) { churn.pollRestarted = true; break; }
+        }
+        churn.reports = ctx.shapeRevision - rev0;
+        churn.ignoreCalls = ignoreCalls.slice();
+      } finally { window.setIgnoreMouseEvents = realSetIgnore; }
+      check("macRestingCursorSurvivesReports", !churn.sawIgnore && !churn.pollRestarted &&
+        !ignoreCalls.includes(true) && churn.reports >= 15, churn);
+      // Unchanged shapes are not re-sent: class-only churn for ~900ms may
+      // produce the forced 1s resend and a trailing frame, nothing more.
+      await wait(100);
+      {
+        const rev0 = ctx.shapeRevision;
+        await window.webContents.executeJavaScript(`(() => { let n = 0; const id = setInterval(() => {
+          document.body.classList.toggle('verify-churn');
+          if (++n >= 18) clearInterval(id); }, 50); })()`);
+        await wait(950);
+        check("macUnchangedShapeNotResent", ctx.shapeRevision - rev0 <= 2,
+          { reports: ctx.shapeRevision - rev0 });
+      }
+
+      // The renderer hit-test arms and disarms through the real forwarded
+      // mousemove path (sendInputEvent -> native.js -> IPC -> recompute).
+      // A gap move first resets the renderer's change-only cache.
+      const eqOn = await window.webContents.executeJavaScript(`(() => {
+        const r = document.getElementById('eq-on').getBoundingClientRect();
+        return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+      })()`);
+      const moveTo = async (point, wantIgnoring) => {
+        window.webContents.sendInputEvent({ type: "mouseMove", x: point.x, y: point.y });
+        for (let i = 0; i < 20 && ctx.macIgnoring !== wantIgnoring; i++) await wait(25);
+        return ctx.macIgnoring;
+      };
+      ctx.setMacState({ rendererOver: false, pollOver: false, held: false });
+      if (gapPoint) {
+        await moveTo(gapPoint, true);
+        check("macRendererHitTestArms", (await moveTo(eqOn, false)) === false);
+        check("macRendererHitTestDisarms", (await moveTo(gapPoint, true)) === true);
+      } else {
+        v.macRendererHitTestSkipped = "no gap point on this display";
+      }
+
+      // An overflowing popup: the EQ presets menu must land in the reported
+      // shape as its own rect, the poll must call its far edge "panel", and
+      // the renderer must arm over it.
+      await window.webContents.executeJavaScript(`document.getElementById('eq-presets').click()`);
+      let menu = null, menuCovered = false;
+      for (let i = 0; i < 20 && !menuCovered; i++) {
+        await wait(30);
+        menu = await window.webContents.executeJavaScript(`(() => {
+          const el = document.getElementById('ctxmenu');
+          const r = el.getBoundingClientRect();
+          return { hidden: el.hidden, x: Math.floor(r.left), y: Math.floor(r.top),
+            right: Math.ceil(r.right), bottom: Math.ceil(r.bottom) };
+        })()`);
+        menuCovered = !menu.hidden && ctx.lastShape.some(r => r.x <= menu.x && r.y <= menu.y &&
+          r.x + r.width >= menu.right && r.y + r.height >= menu.bottom);
+      }
+      const popupPoint = menu ? { x: menu.x + 8, y: menu.bottom - 6 } : null;
+      check("macPopupInNativeShape", menuCovered && !!popupPoint &&
+        ctx.screenPointOverShape(bounds.x + popupPoint.x, bounds.y + popupPoint.y), { menu, menuCovered });
+      if (popupPoint && gapPoint) {
+        ctx.setMacState({ rendererOver: false, pollOver: false, held: false });
+        await moveTo(gapPoint, true);
+        check("macPopupRendererArms", (await moveTo(popupPoint, false)) === false);
+      }
+      await window.webContents.executeJavaScript(`document.getElementById('ctxmenu').hidden = true`);
+
+      // The poll itself, single-stepped under a controlled cursor: parked on
+      // a gap outside every halo it ignores; one tick after the cursor
+      // lands on a panel it is interactive at the near cadence.
+      let gapFar = null;
+      for (let gx = 0; gx < bounds.width && !gapFar; gx += 40)
+        for (let gy = 0; gy < bounds.height && !gapFar; gy += 40)
+          if (!ctx.screenShapeDecision(bounds.x + gx, bounds.y + gy, ctx.macHittest.MAX_MARGIN).near)
+            gapFar = { x: gx, y: gy };
+      ctx.setMacState({ rendererOver: false, pollOver: false, held: false });
+      if (gapFar && rect) {
+        ctx.setMacCursor({ x: bounds.x + gapFar.x, y: bounds.y + gapFar.y });
+        ctx.stepMacPoll(); ctx.stepMacPoll();
+        const parkedIgnores = ctx.macIgnoring === true;
+        ctx.setMacCursor({ x: bounds.x + rect.x + 2, y: bounds.y + rect.y + 2 });
+        const cadence = ctx.stepMacPoll();
+        check("macPollParkedOnGapIgnores", parkedIgnores);
+        check("macPollArmsInOneTick", ctx.macIgnoring === false && cadence === ctx.macHittest.NEAR_MS,
+          { cadence, ignoring: ctx.macIgnoring });
+        ctx.setMacCursor(null);
+      } else {
+        v.macPollStepSkipped = { gapFar, rect: !!rect };
+      }
+
+      // Real HID events, gated on what the runner allows and REPORTED (never
+      // silently passed): warping the real cursor exercises
+      // getCursorScreenPoint and the DIP mapping through the live loop, and
+      // posting a real click is the only way to exercise the NSWindow
+      // ignoresMouseEvents flag itself - synthesized input bypasses it.
+      v.macRealEvents = await macRealEventProbe(ctx, window, bounds, rect, gapFar, eqOn, check);
+
       // For the click test below the window must accept input.
-      ctx.setMacState({ rendererOver: true, pollOver: false });
+      ctx.setMacState({ rendererOver: true, pollOver: false, held: false });
     }
 
     // A real synthesized click through the input pipeline must toggle a
