@@ -887,17 +887,33 @@ html.mac .onboarding-arrow { left: auto; right: 4.5px; }
 }
 .chat-log .msg.user .who,
 .chat-log .msg.assistant .who { display: none; }
-.chat-log .msg.thinking   { color: #009000; margin-right: auto; width: fit-content; }
-.chat-log .msg.thinking .think-dots::after {
-  content: ""; display: inline-block;
-  animation: think-dots 1.1s steps(1, end) infinite;
+/* Typing indicator: an assistant-side bubble holding three dots that pulse
+   in sequence, shown for any model from send until its first token. */
+.chat-log .msg.thinking {
+  color: var(--pl-green);
+  margin-right: auto;
+  width: fit-content;
+  padding: 4px 8px;
+  border-radius: 9px;
+  background: rgba(40,200,40,.12);
 }
-@keyframes think-dots {
-  0%   { content: ""; }
-  25%  { content: "."; }
-  50%  { content: ".."; }
-  75%  { content: "..."; }
-  100% { content: ""; }
+.chat-log .msg.thinking .think-dots {
+  display: inline-flex; align-items: flex-end; gap: 3px;
+  height: 8px; vertical-align: top;
+}
+.chat-log .msg.thinking .think-dots i {
+  display: block; width: 3px; height: 3px;
+  background: var(--pl-green);
+  animation: think-dot 1.2s ease-in-out infinite;
+}
+.chat-log .msg.thinking .think-dots i:nth-child(2) { animation-delay: .2s; }
+.chat-log .msg.thinking .think-dots i:nth-child(3) { animation-delay: .4s; }
+@keyframes think-dot {
+  0%, 60%, 100% { opacity: .25; transform: translateY(0); }
+  30%           { opacity: 1;   transform: translateY(-2px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-log .msg.thinking .think-dots i { animation: none; opacity: .8; }
 }
 .chat-log .msg.system     { color: var(--pl-green); }
 .chat-log .msg.error      { color: #FF4040; }
@@ -1015,6 +1031,8 @@ html.mac .onboarding-arrow { left: auto; right: 4.5px; }
   background-position: right 2px center;
   background-repeat: no-repeat;
   color: var(--btn-text);
+  /* same embossed lettering as the RAIN / search buttons beside it */
+  text-shadow: 1px 1px 0 rgba(238,240,248,.6);
   font-family: var(--font-dot);
   font-size: 5px;
   line-height: 11px;
@@ -1101,12 +1119,13 @@ html.mac .onboarding-arrow { left: auto; right: 4.5px; }
   top: 1px;
   width: 11px;
   height: 11px;
-  /* 7px ring + 2px stepped handle, drawn and shown at NATIVE pixel size.
-     The old icon scaled an 11px grid into a 9px box - fractional pixel
-     scaling is what made it look smudged. */
-  background: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20shape-rendering%3D%27crispEdges%27%20width%3D%2711%27%20height%3D%2711%27%3E%3Cg%20fill%3D%27%23EEF0F8%27%20fill-opacity%3D%270.6%27%20transform%3D%27translate%281%201%29%27%3E%3Crect%20x%3D%272%27%20y%3D%270%27%20width%3D%273%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%271%27%20y%3D%271%27%20width%3D%271%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%275%27%20y%3D%271%27%20width%3D%271%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%270%27%20y%3D%272%27%20width%3D%271%27%20height%3D%273%27%2F%3E%3Crect%20x%3D%276%27%20y%3D%272%27%20width%3D%271%27%20height%3D%273%27%2F%3E%3Crect%20x%3D%271%27%20y%3D%275%27%20width%3D%271%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%275%27%20y%3D%275%27%20width%3D%271%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%272%27%20y%3D%276%27%20width%3D%273%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%276%27%20y%3D%276%27%20width%3D%272%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%277%27%20y%3D%277%27%20width%3D%272%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%278%27%20y%3D%278%27%20width%3D%272%27%20height%3D%271%27%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%27%2311121A%27%3E%3Crect%20x%3D%272%27%20y%3D%270%27%20width%3D%273%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%271%27%20y%3D%271%27%20width%3D%271%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%275%27%20y%3D%271%27%20width%3D%271%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%270%27%20y%3D%272%27%20width%3D%271%27%20height%3D%273%27%2F%3E%3Crect%20x%3D%276%27%20y%3D%272%27%20width%3D%271%27%20height%3D%273%27%2F%3E%3Crect%20x%3D%271%27%20y%3D%275%27%20width%3D%271%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%275%27%20y%3D%275%27%20width%3D%271%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%272%27%20y%3D%276%27%20width%3D%273%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%276%27%20y%3D%276%27%20width%3D%272%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%277%27%20y%3D%277%27%20width%3D%272%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%278%27%20y%3D%278%27%20width%3D%272%27%20height%3D%271%27%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E") no-repeat;
+  /* 7px ring + 2px stepped handle on an 11px grid, shown at its native
+     size. The art is a vector (geometricPrecision, no nearest-neighbor
+     resampling): at 100% display scale every rect lands on whole pixels
+     and stays crisp, and at 125%/150% it resamples evenly instead of the
+     lopsided ring nearest-neighbor produced at 1x zoom. */
+  background: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20shape-rendering%3D%27geometricPrecision%27%20width%3D%2711%27%20height%3D%2711%27%3E%3Cg%20fill%3D%27%23EEF0F8%27%20fill-opacity%3D%270.6%27%20transform%3D%27translate%281%201%29%27%3E%3Crect%20x%3D%272%27%20y%3D%270%27%20width%3D%273%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%271%27%20y%3D%271%27%20width%3D%271%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%275%27%20y%3D%271%27%20width%3D%271%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%270%27%20y%3D%272%27%20width%3D%271%27%20height%3D%273%27%2F%3E%3Crect%20x%3D%276%27%20y%3D%272%27%20width%3D%271%27%20height%3D%273%27%2F%3E%3Crect%20x%3D%271%27%20y%3D%275%27%20width%3D%271%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%275%27%20y%3D%275%27%20width%3D%271%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%272%27%20y%3D%276%27%20width%3D%273%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%276%27%20y%3D%276%27%20width%3D%272%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%277%27%20y%3D%277%27%20width%3D%272%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%278%27%20y%3D%278%27%20width%3D%272%27%20height%3D%271%27%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%27%2311121A%27%3E%3Crect%20x%3D%272%27%20y%3D%270%27%20width%3D%273%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%271%27%20y%3D%271%27%20width%3D%271%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%275%27%20y%3D%271%27%20width%3D%271%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%270%27%20y%3D%272%27%20width%3D%271%27%20height%3D%273%27%2F%3E%3Crect%20x%3D%276%27%20y%3D%272%27%20width%3D%271%27%20height%3D%273%27%2F%3E%3Crect%20x%3D%271%27%20y%3D%275%27%20width%3D%271%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%275%27%20y%3D%275%27%20width%3D%271%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%272%27%20y%3D%276%27%20width%3D%273%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%276%27%20y%3D%276%27%20width%3D%272%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%277%27%20y%3D%277%27%20width%3D%272%27%20height%3D%271%27%2F%3E%3Crect%20x%3D%278%27%20y%3D%278%27%20width%3D%272%27%20height%3D%271%27%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E") no-repeat;
   background-size: 11px 11px;
-  image-rendering: pixelated;
 }
 #yt-search-button::after {
   content: none;
@@ -1578,13 +1597,6 @@ html.mac .onboarding-arrow { left: auto; right: 4.5px; }
 }
 .w95-btn:active { border-color: #000 #fff #fff #000; }
 .w95-dialog p { margin-bottom: 6px; }
-.legal-link-row { margin-top: 6px; text-align: center; }
-.legal-link-row a, .legal-body a { color: #0000C6; text-decoration: underline; }
-.legal-dialog { width: 470px; top: 24px; }
-.legal-body p { margin-bottom: 5px; line-height: 11px; }
-.legal-body code { font-family: var(--font-mono); }
-.legal-h { font-weight: 700; color: #000; margin: 8px 0 3px; }
-.legal-h:first-child { margin-top: 0; }
 .compact-dialog { width: 230px; }
 .saved-playlists,
 .jump-results {
@@ -1829,14 +1841,27 @@ html.mac .modern-ui .sm-tab:hover { background:rgba(255,255,255,.45); }
 /* About: the same white panel as Settings, narrower, content centered */
 #about-modern .window { width:min(560px,96vw); }
 .modern-ui .about-hero { text-align:center; }
-.modern-ui .about-logo { display:block; width:min(300px,82%); margin:2px auto 14px; }
-.modern-ui .about-url { margin:0 0 10px; font-size:15px; }
+/* The logo image is trimmed to its opaque bounds, so these two margins are
+   the real gaps: the same 12px above and below the URL. */
+.modern-ui .about-logo { display:block; width:min(300px,82%); margin:2px auto 12px; }
+.modern-ui .about-url { margin:0 0 12px; font-size:15px; line-height:1.2; }
 .modern-ui .about-url a, .modern-ui .about-credit a { color:#b0491f; font-weight:600; text-decoration:none; }
 .modern-ui .about-url a:hover, .modern-ui .about-credit a:hover { text-decoration:underline; }
 .modern-ui .about-tagline { margin:0 0 8px; font-size:15px; line-height:1.45; }
 .modern-ui .about-credit { text-align:center; }
 .modern-ui .about-credit p { margin:0; font-size:15px; }
 .modern-ui .about-credit p + p { margin-top:6px; }
+/* Details, legal & privacy: opens in place under the API keys as a
+   scrollable panel (no separate dialog). */
+.modern-ui .legal-panel { max-height:230px; overflow-y:auto; margin-top:14px; padding:14px 18px; border:1px solid var(--line); border-radius:11px; background:var(--panel-soft); color:var(--text); font-size:13.5px; line-height:1.5; text-align:left; scrollbar-width:thin; }
+.modern-ui .legal-panel:focus-visible { outline:none; border-color:var(--blue); box-shadow:var(--focus); }
+.modern-ui .legal-panel h3 { margin:12px 0 4px; font-size:14px; line-height:1.3; }
+.modern-ui .legal-panel h3:first-child { margin-top:0; }
+.modern-ui .legal-panel p { margin:0 0 8px; }
+.modern-ui .legal-panel p:last-child { margin-bottom:0; }
+.modern-ui .legal-panel code { font-family:var(--font-mono); font-size:12.5px; }
+.modern-ui .legal-panel a { color:#b0491f; font-weight:600; text-decoration:none; }
+.modern-ui .legal-panel a:hover { text-decoration:underline; }
 /* Settings and About move by their header (js/app.js makeModernDraggable) */
 .modern-ui .window.draggable .header { cursor:grab; user-select:none; touch-action:none; }
 .modern-ui .window.draggable.dragging .header { cursor:grabbing; }

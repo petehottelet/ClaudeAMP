@@ -249,9 +249,9 @@ test("search is source-aware and only presents playable results", () => {
   assert.match(css, /\.yt-result-add\s*\{[^}]*width:\s*36px/s);
   const searchIcon = css.match(/#yt-search-button::before\s*\{([^}]*)\}/)?.[1] || "";
   assert.match(searchIcon, /data:image\/svg\+xml/);
-  assert.match(searchIcon, /shape-rendering%3D%27crispEdges%27/);
+  assert.match(searchIcon, /shape-rendering%3D%27geometricPrecision%27/);
   assert.match(searchIcon, /fill-opacity%3D%270\.6%27/);
-  assert.match(searchIcon, /image-rendering:\s*pixelated/);
+  assert.doesNotMatch(searchIcon, /image-rendering:\s*pixelated/);
   assert.doesNotMatch(searchIcon, /border-radius|rotate\(/);
   assert.match(css, /#yt-search-button::after\s*\{\s*content:\s*none;\s*\}/);
   assert.match(css, /#mb-reset-button\s*\{[^}]*width:\s*18px/s);
@@ -296,6 +296,37 @@ test("half-step zoom options remain available", () => {
   assert.match(app, /setZoom\(1\.5\)/);
   assert.match(html, /name="sm-zoom"[^>]*value="2\.5"/);
   assert.match(app, /setZoom\(2\.5\)/);
+});
+
+test("every provider shows the three-dot typing indicator until its first token", () => {
+  const generation = app.slice(app.indexOf("function startGeneration"), app.indexOf("const rawHandlers"));
+  assert.match(generation, /showThinking\(\);/);
+  const thinking = app.slice(app.indexOf("function showThinking"), app.indexOf("function hideThinking"));
+  assert.doesNotMatch(thinking, /"THINKING"/);
+  assert.match(thinking, /for \(let i = 0; i < 3; i\+\+\) dots\.appendChild\(document\.createElement\("i"\)\)/);
+  assert.match(app, /onText\(t\) \{[\s\S]*?hideThinking\(\);/);
+  assert.match(css, /\.chat-log \.msg\.thinking \.think-dots i\s*\{[^}]*animation:\s*think-dot/s);
+  assert.match(css, /\.think-dots i:nth-child\(3\)\s*\{\s*animation-delay/);
+  assert.doesNotMatch(css, /content:\s*"\.\.\."/);
+});
+
+test("legal and privacy details unfold inside Settings instead of a dialog", () => {
+  assert.match(html, /id="sm-legal-panel"/);
+  assert.doesNotMatch(html, /id="dlg-legal"/);
+  assert.doesNotMatch(app, /showDialog\("dlg-legal"\)/);
+  assert.match(app, /function toggleLegalPanel/);
+  assert.match(app, /toggleLegalPanel\(false\);/);
+  assert.match(css, /\.modern-ui \.legal-panel\s*\{[^}]*overflow-y:\s*auto/);
+  assert.doesNotMatch(css, /\.legal-dialog/);
+  // the music-source dropdown carries the same embossed lettering as the
+  // RAIN and search buttons beside it
+  assert.match(css, /#music-search-source\s*\{[^}]*text-shadow:\s*1px 1px 0 rgba\(238,240,248,\.6\)/s);
+  // the magnifier is vector art, never nearest-neighbor resampled: at
+  // fractional display scales that produced a lopsided ring at 1x zoom
+  const magnifier = css.slice(css.indexOf("#yt-search-button::before {"), css.indexOf("#yt-search-button::after"));
+  assert.doesNotMatch(magnifier, /image-rendering:\s*pixelated/);
+  assert.match(magnifier, /geometricPrecision/);
+  assert.doesNotMatch(magnifier, /crispEdges/);
 });
 
 test("About is a modern overlay and the modern panels drag by their header", () => {
