@@ -3426,7 +3426,10 @@
   /* ---- SNAKE: a playable game living in the visualization window (replaces
      the tunnel FX). Rendered on a high-res, smoothly-scaled backing so the
      grid and the corner HUD stay crisp. Arrow keys steer it (wired below). */
-  const SNAKE_COLS = 25, SNAKE_ROWS = 15, SNAKE_CELL = 24;
+  // 50x30 cells of 12px (was 25x15 of 24px): the same 600x360 backing at
+  // twice the density, so the snake and its pellet are half the size on
+  // screen. The step interval below is halved to match, keeping the pace.
+  const SNAKE_COLS = 50, SNAKE_ROWS = 30, SNAKE_CELL = 12;
   const SNAKEW = SNAKE_COLS * SNAKE_CELL, SNAKEH = SNAKE_ROWS * SNAKE_CELL;
   let snake = null, snakeBest = 0, snakeLastT = 0;
   function snakeFood(body) {
@@ -3437,7 +3440,7 @@
   }
   function snakeReset() {
     const cy = SNAKE_ROWS >> 1;
-    const body = [{ x: 6, y: cy }, { x: 5, y: cy }, { x: 4, y: cy }];
+    const body = [{ x: 12, y: cy }, { x: 11, y: cy }, { x: 10, y: cy }, { x: 9, y: cy }];
     snake = { body, dir: { x: 1, y: 0 }, queued: { x: 1, y: 0 },
       food: snakeFood(body), score: 0, level: 1, acc: 0, over: false, started: false };
   }
@@ -3495,24 +3498,23 @@
     // advance the game
     if (snake.started && !snake.over) {
       snake.acc += dt;
-      const interval = Math.max(0.06, 0.20 - (snake.level - 1) * 0.014); // faster each level
+      const interval = Math.max(0.035, 0.11 - (snake.level - 1) * 0.008); // faster each level
       let guard = 8;
       while (snake.acc >= interval && guard-- > 0) { snake.acc -= interval; snakeStep(); if (snake.over) break; }
     }
-    // target dot: the brightest green, glowing and pulsing
+    // target pellet: a square (like the snake's own cells), the brightest
+    // green, glowing and pulsing
     const pulse = 0.5 + 0.5 * Math.sin(now / 240);      // 0..1 breathing cycle
-    const fx = snake.food.x * cell + cell / 2;
-    const fy = snake.food.y * cell + cell / 2;
-    const fr = (cell - 8) / 2 + pulse * 2;               // radius pulses slightly
+    const side = cell - 4 + Math.round(pulse * 2);       // 8..10px, pulses slightly
+    const fx = Math.round(snake.food.x * cell + (cell - side) / 2);
+    const fy = Math.round(snake.food.y * cell + (cell - side) / 2);
     const lift = Math.round(pulse * 150);                // brightness pulses
     ctx.save();
     ctx.shadowColor = "#66ff33";
-    ctx.shadowBlur = 14 + pulse * 22;                    // glowing halo pulses
+    ctx.shadowBlur = 8 + pulse * 12;                     // glowing halo pulses
     ctx.fillStyle = "rgb(" + (90 + lift) + ",255," + (60 + lift) + ")";
-    ctx.beginPath();
-    ctx.arc(fx, fy, fr, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fill();                                          // second pass intensifies glow
+    ctx.fillRect(fx, fy, side, side);
+    ctx.fillRect(fx, fy, side, side);                    // second pass intensifies glow
     ctx.restore();
     // snake body (head brightest)
     for (let i = 0; i < snake.body.length; i++) {

@@ -19,6 +19,10 @@ the `package.json` version, which CI requires to agree with `js/version.js`.
 - Visualization window: the music-source dropdown lettering carries the
   same emboss as the RAIN and search buttons beside it.
 
+- Snake: the board is twice as dense (50x30 cells), so the snake and its
+  pellet are half the size on screen at the same pace, and the pellet is a
+  square like the snake's cells instead of a round dot.
+
 ### Fixed
 - Visualization window: the search magnifier no longer comes out lopsided
   at 1x zoom on displays with fractional scaling (125%, 150%); it is

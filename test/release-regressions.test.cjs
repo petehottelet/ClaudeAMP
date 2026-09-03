@@ -310,6 +310,14 @@ test("every provider shows the three-dot typing indicator until its first token"
   assert.doesNotMatch(css, /content:\s*"\.\.\."/);
 });
 
+test("snake runs on the dense 50x30 board with a square pellet", () => {
+  assert.match(app, /const SNAKE_COLS = 50, SNAKE_ROWS = 30, SNAKE_CELL = 12;/);
+  const game = app.slice(app.indexOf("function snakeGame"), app.indexOf("const fxEnergy"));
+  assert.doesNotMatch(game, /ctx\.arc\(/);
+  assert.match(game, /ctx\.fillRect\(fx, fy, side, side\)/);
+  assert.match(game, /Math\.max\(0\.035, 0\.11 - \(snake\.level - 1\) \* 0\.008\)/);
+});
+
 test("legal and privacy details unfold inside Settings instead of a dialog", () => {
   assert.match(html, /id="sm-legal-panel"/);
   assert.doesNotMatch(html, /id="dlg-legal"/);
